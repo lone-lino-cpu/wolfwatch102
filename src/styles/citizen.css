@@ -1,0 +1,353 @@
+
+  :root{
+    --bg:#0A0A0C;
+    --panel:#16161B;
+    --panel-raised:#1E1E25;
+    --border:#2B2B33;
+    --text:#EDEDE6;
+    --text-dim:#8E8E99;
+    --accent:#4A6FA5;
+    --accent-bright:#6E92C7;
+    --accent-soft:rgba(74,111,165,0.16);
+    --danger:#FF2E2E;
+    --danger-bright:#FF5A5A;
+    --danger-soft:rgba(255,46,46,0.12);
+    --amber:#FFB703;
+    --amber-soft:rgba(255,183,3,0.12);
+    --green:#3FBE6B;
+    --radius-sm:6px;
+    --radius-md:12px;
+    --radius-lg:20px;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background: var(--bg);
+    color:var(--text);
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:28px 14px;
+    -webkit-font-smoothing:antialiased;
+    position:relative;
+    overflow-x:hidden;
+  }
+  /* On wider (laptop/desktop) viewports the phone card no longer fills the
+     screen on its own, so give the extra space a subtle presence instead of
+     leaving it flat and empty: a soft radial glow plus a faint oversized wolf
+     silhouette behind the card. Purely decorative — never shown on phones. */
+  body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    z-index:0;
+    background:
+      radial-gradient(circle at 50% 42%, rgba(74,111,165,0.10), transparent 55%),
+      radial-gradient(circle at 50% 50%, var(--bg) 0%, #050506 100%);
+    display:none;
+  }
+  body::after{
+    content:"";
+    position:fixed;
+    top:50%; left:50%;
+    width:min(70vw, 900px);
+    height:min(70vw, 900px);
+    transform:translate(-50%,-50%);
+    background:var(--text);
+    opacity:0.035;
+    clip-path:polygon(20% 8%, 38% 32%, 50% 22%, 62% 32%, 80% 8%, 88% 50%, 50% 96%, 12% 50%);
+    z-index:0;
+    display:none;
+    pointer-events:none;
+  }
+  @media (min-width:760px){
+    body::before, body::after{ display:block; }
+  }
+  ::placeholder{ color:#5B5B66; }
+  h1,h2,h3{
+    font-family:"Oswald","Inter",sans-serif;
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    margin:0;
+  }
+  .phone{
+    position:relative;
+    z-index:1;
+    width:100%;
+    max-width:clamp(380px, 46vw, 560px);
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:18px;
+    overflow:hidden;
+    box-shadow:0 30px 60px -20px rgba(0,0,0,0.7);
+    min-height:min(82vh, 820px);
+    display:flex;
+    flex-direction:column;
+  }
+  @media (min-width:760px){
+    .phone{ box-shadow:0 40px 90px -20px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.02); }
+  }
+  .topbar{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:16px 18px;
+    border-bottom:1px solid var(--border);
+    background:var(--panel);
+  }
+  .wolf-mark{ display:flex; align-items:center; gap:10px; }
+  .wolf-mark svg{ width:28px; height:28px; flex:none; }
+  .wolf-eye{ fill:var(--text-dim); transition:fill .4s ease; }
+  .wolf-eye.alert{ fill:var(--danger); animation:eyeglow 1.4s ease-in-out infinite; }
+  @keyframes eyeglow{
+    0%,100%{ fill:var(--danger); filter:drop-shadow(0 0 1px var(--danger)); }
+    50%{ fill:var(--danger-bright); filter:drop-shadow(0 0 6px var(--danger)); }
+  }
+  .brand{
+    font-family:"Oswald",sans-serif;
+    font-size:16px;
+    font-weight:600;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+  }
+  .brand small{
+    display:block;
+    font-family:"Inter",sans-serif;
+    font-size:11px;
+    color:var(--text-dim);
+    font-weight:400;
+    text-transform:none;
+    letter-spacing:0;
+    margin-top:2px;
+  }
+  .screen{ padding:clamp(22px,3vw,34px) clamp(18px,3vw,32px) clamp(26px,3vw,36px); flex:1; display:none; overflow-y:auto; }
+  .screen.active{ display:block; }
+
+  /* ---------- form controls ---------- */
+  label{
+    display:block;
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    color:var(--text-dim);
+    margin:18px 0 8px;
+  }
+  input[type=text], input[type=password], input[type=tel], textarea{
+    width:100%;
+    background:var(--panel-raised);
+    border:1px solid var(--border);
+    border-radius:var(--radius-sm);
+    padding:12px 13px;
+    color:var(--text);
+    font-size:14.5px;
+    font-family:"Inter",sans-serif;
+  }
+  input:focus, textarea:focus, button:focus-visible{
+    outline:2px solid var(--accent-bright);
+    outline-offset:1px;
+    border-color:var(--accent-bright);
+  }
+  textarea{ resize:vertical; min-height:80px; }
+
+  .phone-field{ display:flex; align-items:stretch; }
+  .phone-field .phone-prefix{
+    display:flex; align-items:center; padding:0 10px;
+    background:var(--panel-raised); border:1px solid var(--border); border-right:none;
+    border-radius:var(--radius-sm) 0 0 var(--radius-sm); color:var(--text-dim);
+    font-size:14.5px; font-family:"JetBrains Mono",monospace;
+  }
+  .phone-field input{ border-radius:0 var(--radius-sm) var(--radius-sm) 0; }
+
+  .upload-box{
+    display:block;
+    border:1px dashed var(--border);
+    border-radius:var(--radius-sm);
+    padding:16px;
+    text-align:center;
+    cursor:pointer;
+    background:var(--panel-raised);
+    color:var(--text-dim);
+    font-size:13px;
+    transition:border-color .15s ease, color .15s ease;
+  }
+  .upload-box:hover{ border-color:var(--accent-bright); color:var(--text); }
+  .upload-box input{ display:none; }
+  .upload-box .hint{ font-size:12px; color:var(--text-dim); margin-top:4px; }
+  .upload-preview{
+    margin-top:10px;
+    width:100%;
+    max-height:120px;
+    object-fit:cover;
+    border-radius:var(--radius-sm);
+    display:none;
+  }
+
+  button.primary{
+    width:100%;
+    margin-top:22px;
+    padding:14px;
+    border:none;
+    border-radius:var(--radius-sm);
+    background:var(--text);
+    color:var(--bg);
+    font-family:"Oswald",sans-serif;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    font-weight:600;
+    font-size:14.5px;
+    cursor:pointer;
+  }
+  button.primary:hover{ background:#fff; }
+  .link-btn{
+    background:none;border:none;color:var(--accent-bright);
+    font-size:13px;cursor:pointer;margin-top:14px;display:block;width:100%;
+    text-align:center;font-family:"Inter",sans-serif;text-decoration:underline;
+  }
+  .error-text{ color:var(--danger-bright); font-size:12.5px; margin-top:10px; min-height:16px; line-height:1.5; }
+
+  /* ---------- home screen ---------- */
+  .id-card{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    background:var(--panel-raised);
+    border:1px solid var(--border);
+    border-radius:var(--radius-md);
+    padding:14px;
+  }
+  .id-card img{
+    width:54px;height:54px;border-radius:8px;object-fit:cover;
+    border:1px solid var(--border);
+    background:var(--bg);
+  }
+  .id-card .name{ font-family:"Oswald",sans-serif; font-size:16px; text-transform:uppercase; letter-spacing:0.03em; }
+  .id-card .sub{ font-size:11.5px; color:var(--text-dim); margin-top:3px; font-family:"JetBrains Mono",monospace; }
+
+  .section-title{
+    font-family:"Inter",sans-serif;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.12em;
+    color:var(--text-dim);
+    margin:24px 0 10px;
+  }
+
+  .crime-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+  @media (min-width:760px){
+    .crime-grid{ grid-template-columns:1fr 1fr 1fr; }
+  }
+  .crime-btn{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    background:var(--panel-raised);
+    border:1px solid var(--border);
+    border-radius:var(--radius-sm);
+    color:var(--text);
+    padding:12px 11px;
+    font-size:13px;
+    font-weight:500;
+    text-align:left;
+    cursor:pointer;
+    font-family:"Inter",sans-serif;
+    transition:border-color .15s ease;
+  }
+  .crime-btn:hover{ border-color:var(--accent-bright); }
+  .crime-btn .dot{ width:9px; height:9px; border-radius:50%; flex:none; }
+
+  /* ---------- SOS ---------- */
+  .sos-wrap{ margin:26px 0 6px; }
+  .sos-btn{
+    width:100%;
+    padding:clamp(20px,2.8vw,34px);
+    border-radius:14px;
+    border:none;
+    background:var(--danger);
+    color:#fff;
+    font-family:"Oswald",sans-serif;
+    font-weight:700;
+    font-size:clamp(20px,2.4vw,30px);
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    cursor:pointer;
+    position:relative;
+    box-shadow:0 0 0 0 rgba(255,46,46,0.5);
+    animation:pulse 2.2s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%{ box-shadow:0 0 0 0 rgba(255,46,46,0.5); }
+    70%{ box-shadow:0 0 0 22px rgba(255,46,46,0); }
+    100%{ box-shadow:0 0 0 0 rgba(255,46,46,0); }
+  }
+  .sos-caption{ text-align:center; font-size:12px; color:var(--text-dim); margin-top:10px; line-height:1.5; }
+
+  /* ---------- alert ticker + admin feed ---------- */
+  .urgent-banner{
+    display:none;
+    align-items:center;
+    gap:10px;
+    background:var(--amber-soft);
+    border:1px solid var(--amber);
+    color:var(--amber);
+    border-radius:var(--radius-sm);
+    padding:10px 12px;
+    font-size:12.5px;
+    margin-bottom:14px;
+  }
+  .urgent-banner.show{ display:flex; }
+  .urgent-dot{
+    width:8px;height:8px;border-radius:50%;background:var(--amber);flex:none;
+    animation:blink 1.2s infinite;
+  }
+  @keyframes blink{ 50%{ opacity:.25; } }
+
+  .feed-item{
+    background:var(--panel-raised);
+    border:1px solid var(--border);
+    border-left:3px solid var(--accent);
+    border-radius:var(--radius-sm);
+    padding:10px 12px;
+    font-size:13px;
+    margin-bottom:8px;
+  }
+  .feed-item.urgent{ border-left-color:var(--amber); }
+  .feed-item .meta{ font-size:11px; color:var(--text-dim); margin-top:5px; font-family:"JetBrains Mono",monospace; }
+  .empty-note{ color:var(--text-dim); font-size:12.5px; line-height:1.6; }
+
+  .status-pill{
+    display:inline-block;
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    padding:2px 8px;
+    border-radius:20px;
+    margin-top:6px;
+    color:#fff;
+  }
+
+  .toast{
+    position:fixed; left:50%; bottom:24px; transform:translateX(-50%);
+    background:var(--panel-raised); border:1px solid var(--border);
+    color:var(--text); padding:12px 18px; border-radius:var(--radius-sm);
+    font-size:13px; box-shadow:0 10px 30px rgba(0,0,0,.5);
+    display:none; z-index:50; max-width:340px; text-align:center;
+  }
+  .topnav{
+    display:flex; border-top:1px solid var(--border);
+    background:var(--panel);
+  }
+  .topnav button{
+    flex:1; background:none; border:none; color:var(--text-dim);
+    padding:12px; font-size:11px; text-transform:uppercase; letter-spacing:0.06em;
+    cursor:pointer; font-family:"Inter",sans-serif;
+  }
+  .topnav button.active{ color:var(--accent-bright); }
+  #btn-logout{ color:var(--danger-bright); }
+  #btn-logout:hover{ color:var(--danger); }

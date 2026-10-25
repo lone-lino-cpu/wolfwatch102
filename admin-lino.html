@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WolfWatch — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<style>
+  :root{
+    --bg:#0A0A0C;
+    --panel:#16161B;
+    --panel-raised:#1E1E25;
+    --border:#2B2B33;
+    --text:#EDEDE6;
+    --text-dim:#8E8E99;
+    --accent:#4A6FA5;
+    --accent-bright:#6E92C7;
+    --danger:#FF2E2E;
+    --danger-bright:#FF5A5A;
+    --amber:#FFB703;
+    --green:#3FBE6B;
+    --yellow:#FFD60A;
+    font-family:"Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--text); -webkit-font-smoothing:antialiased; }
+  ::placeholder{ color:#5B5B66; }
+  h1,h2,h3{ font-family:"Oswald","Inter",sans-serif; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; margin:0; }
+  .wolf-mark{ display:flex; align-items:center; }
+  .wolf-eye{ fill:var(--text-dim); transition:fill .4s ease; }
+  .wolf-eye.alert{ fill:var(--danger); animation:eyeglow 1.4s ease-in-out infinite; }
+  @keyframes eyeglow{
+    0%,100%{ fill:var(--danger); filter:drop-shadow(0 0 1px var(--danger)); }
+    50%{ fill:var(--danger-bright); filter:drop-shadow(0 0 6px var(--danger)); }
+  }
+
+  /* ---------------- Login ---------------- */
+  .login-wrap{
+    min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(circle at 30% 20%, #16161B, #0A0A0C 70%);
+  }
+  .login-card{
+    width:340px; background:var(--panel); border:1px solid var(--border);
+    border-radius:14px; padding:32px 26px; box-shadow:0 30px 60px -20px rgba(0,0,0,.7);
+  }
+  .login-card .wolf-mark{ display:flex; justify-content:center; margin-bottom:16px; }
+  .login-card .wolf-mark svg{ width:42px; height:42px; }
+  .login-card h2{ text-align:center; }
+  .login-card .sub{ text-align:center; color:var(--text-dim); font-size:12px; margin-top:6px; text-transform:uppercase; letter-spacing:0.08em; }
+  .login-card label{ display:block; font-size:12px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-dim); margin:18px 0 8px; }
+  .login-card input{
+    width:100%; background:var(--panel-raised); border:1px solid var(--border);
+    border-radius:6px; padding:12px 13px; color:var(--text); font-size:14.5px; font-family:"Inter",sans-serif;
+  }
+  .login-card input:focus{ outline:2px solid var(--accent-bright); outline-offset:1px; border-color:var(--accent-bright); }
+  .login-card button{
+    width:100%; margin-top:22px; padding:13px; border:none; border-radius:6px;
+    background:var(--text); color:var(--bg); font-family:"Oswald",sans-serif; text-transform:uppercase;
+    letter-spacing:0.06em; font-weight:600; cursor:pointer; font-size:14.5px;
+  }
+  .login-card button:hover{ background:#fff; }
+  .login-error{ color:var(--danger-bright); font-size:12px; margin-top:10px; min-height:16px; text-align:center; line-height:1.6; }
+
+  /* ---------------- Dashboard shell ---------------- */
+  .shell{ display:none; height:100vh; }
+  .shell.active{ display:grid; grid-template-columns:300px 1fr 400px; }
+  .mobile-map-toggle{
+    display:none; margin-left:auto; background:none; border:1px solid var(--border); color:var(--text-dim);
+    font-size:11px; text-transform:uppercase; letter-spacing:0.04em; padding:5px 10px; border-radius:6px; cursor:pointer;
+  }
+  @media (max-width:1100px){
+    /* Narrow admin window: keep the sidebar and the detailed case panel
+       (where dispatching happens) and tuck the map behind a toggle instead
+       of showing three cramped columns. */
+    .shell.active{ grid-template-columns:280px 1fr; }
+    .mobile-map-toggle{ display:block; }
+    .map-area{ display:none; }
+    .map-area.show-mobile{ display:block; grid-column:1 / -1; position:fixed; inset:0; z-index:500; }
+  }
+
+  .sidebar{
+    background:var(--panel); border-right:1px solid var(--border);
+    display:flex; flex-direction:column; overflow-y:auto;
+  }
+  .side-header{
+    display:flex; align-items:center; gap:10px; padding:18px;
+    border-bottom:1px solid var(--border);
+  }
+  .side-header .wolf-mark svg{ width:28px; height:28px; }
+  .side-header .brand{ font-family:"Oswald",sans-serif; font-weight:600; text-transform:uppercase; letter-spacing:0.1em; font-size:15px; }
+  .side-header .brand small{ display:block; color:var(--text-dim); font-size:11px; font-weight:400; text-transform:none; letter-spacing:0; margin-top:2px; }
+  .side-body{ padding:18px; flex:1; }
+  .side-section-title{ font-size:11px; text-transform:uppercase; letter-spacing:0.12em; color:var(--text-dim); margin:22px 0 10px; }
+  .side-section-title:first-child{ margin-top:0; }
+
+  textarea#msg-text{
+    width:100%; min-height:80px; background:var(--panel-raised);
+    border:1px solid var(--border); border-radius:6px; color:var(--text);
+    padding:11px; font-family:"Inter",sans-serif; font-size:13.5px; resize:vertical;
+  }
+  textarea#msg-text:focus{ outline:2px solid var(--accent-bright); outline-offset:1px; border-color:var(--accent-bright); }
+  .urgent-toggle{
+    display:flex; align-items:center; gap:8px; margin-top:10px; font-size:12.5px; color:var(--text-dim);
+  }
+  button.send-btn{
+    width:100%; margin-top:10px; padding:11px; border:none; border-radius:6px;
+    background:var(--amber); color:#1B140A; font-family:"Oswald",sans-serif; text-transform:uppercase;
+    letter-spacing:0.05em; font-weight:600; cursor:pointer; font-size:13px;
+  }
+  .msg-log{ margin-top:12px; max-height:150px; overflow-y:auto; }
+  .msg-item{
+    background:var(--panel-raised); border:1px solid var(--border); border-left:3px solid var(--amber);
+    border-radius:6px; padding:9px 10px; font-size:12px; margin-bottom:6px;
+  }
+  .msg-item .meta{ color:var(--text-dim); font-size:10.5px; margin-top:4px; font-family:"JetBrains Mono",monospace; }
+
+  .legend{ display:flex; flex-direction:column; gap:9px; font-size:12.5px; }
+  .legend .row{ display:flex; align-items:center; gap:8px; }
+  .legend .swatch{ width:10px; height:10px; border-radius:50%; flex:none; }
+
+  .stat-row{ display:flex; gap:10px; }
+  .stat-box{
+    flex:1; background:var(--panel-raised); border:1px solid var(--border);
+    border-radius:8px; padding:10px; text-align:center;
+  }
+  .stat-box .num{ font-family:"JetBrains Mono",monospace; font-size:20px; font-weight:500; }
+  .stat-box .label{ font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-dim); margin-top:3px; }
+  .stat-clickable{ cursor:pointer; transition:border-color .15s ease; }
+  .stat-clickable:hover{ border-color:var(--accent-bright); }
+
+  .sos-row{
+    background:var(--danger-soft, rgba(255,46,46,0.08)); border:1px solid var(--danger);
+    border-radius:6px; padding:9px 10px; margin-bottom:6px; font-size:12px;
+    display:flex; align-items:center; gap:9px;
+  }
+  .sos-row img{ width:34px; height:34px; border-radius:6px; object-fit:cover; border:1px solid var(--border); flex:none; }
+  .sos-row .sr-info{ flex:1; min-width:0; }
+  .sos-row .sr-name{ font-weight:600; color:var(--danger-bright); }
+  .sos-row .sr-meta{ font-size:10.5px; color:var(--text-dim); font-family:"JetBrains Mono",monospace; margin-top:2px; }
+  .sos-row button{
+    flex:none; background:var(--danger); color:#fff; border:none; border-radius:5px;
+    padding:6px 9px; font-size:10.5px; text-transform:uppercase; letter-spacing:0.04em;
+    cursor:pointer; font-family:"Inter",sans-serif;
+  }
+  .sos-row button:hover{ background:var(--danger-bright); }
+
+  .modal-overlay{
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65);
+    align-items:center; justify-content:center; z-index:1000; padding:20px;
+  }
+  .modal-overlay.show{ display:flex; }
+  .modal-card{
+    background:var(--panel); border:1px solid var(--border); border-radius:12px;
+    width:100%; max-width:480px; max-height:80vh; display:flex; flex-direction:column;
+    box-shadow:0 30px 60px -20px rgba(0,0,0,0.7);
+  }
+  .modal-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 18px; border-bottom:1px solid var(--border); flex:none;
+  }
+  .modal-close{
+    background:none; border:none; color:var(--text-dim); font-size:22px;
+    line-height:1; cursor:pointer; padding:0 4px;
+  }
+  .modal-close:hover{ color:var(--text); }
+  .citizens-list{ overflow-y:auto; padding:14px 18px 18px; }
+  .citizen-row{
+    display:flex; align-items:center; gap:12px; padding:10px 0;
+    border-bottom:1px solid var(--border);
+  }
+  .citizen-row:last-child{ border-bottom:none; }
+  .citizen-row img{ width:42px; height:42px; border-radius:8px; object-fit:cover; border:1px solid var(--border); flex:none; }
+  .citizen-row .cr-name{ font-weight:600; font-size:13.5px; }
+  .citizen-row .cr-meta{ font-size:11px; color:var(--text-dim); margin-top:2px; font-family:"JetBrains Mono",monospace; }
+  .citizen-row .cr-online{ display:inline-flex; align-items:center; gap:4px; margin-left:8px; font-size:10px; text-transform:uppercase; letter-spacing:0.04em; }
+  .citizen-row .cr-online .dot{ width:7px; height:7px; border-radius:50%; background:var(--text-dim); }
+  .citizen-row .cr-online.online{ color:var(--green); }
+  .citizen-row .cr-online.online .dot{ background:var(--green); box-shadow:0 0 5px var(--green); }
+
+  .add-case-btn{
+    background:none; border:1px solid var(--border); color:var(--accent-bright);
+    font-size:11px; text-transform:uppercase; letter-spacing:0.04em; padding:4px 9px;
+    border-radius:6px; cursor:pointer; font-family:"Inter",sans-serif;
+  }
+  .add-case-btn:hover{ border-color:var(--accent-bright); }
+  .case-controls{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+  .mini-toggle{ text-transform:none; letter-spacing:0; font-size:11px; color:var(--text-dim); display:flex; align-items:center; gap:5px; cursor:pointer; }
+  #sort-cases{ font-size:11px; padding:4px 6px; }
+
+  .modal-body{ padding:14px 18px 18px; overflow-y:auto; }
+  .modal-body label{ display:block; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-dim); margin:14px 0 6px; }
+  .modal-body label:first-child{ margin-top:0; }
+  .modal-body input, .modal-body select, .modal-body textarea{
+    width:100%; background:var(--panel-raised); border:1px solid var(--border); border-radius:6px;
+    padding:10px 11px; color:var(--text); font-size:13.5px; font-family:"Inter",sans-serif;
+  }
+  .modal-body textarea{ min-height:70px; resize:vertical; }
+  .modal-body input:focus, .modal-body select:focus, .modal-body textarea:focus{
+    outline:2px solid var(--accent-bright); outline-offset:1px; border-color:var(--accent-bright);
+  }
+
+  .sos-detail-grid{ display:flex; gap:12px; margin-bottom:14px; }
+  .sos-detail-grid .photo-block{ flex:1; text-align:center; }
+  .sos-detail-grid img{ width:100%; aspect-ratio:1; object-fit:cover; border-radius:8px; border:1px solid var(--border); background:var(--panel-raised); }
+  .sos-detail-grid .photo-label{ font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-dim); margin-top:5px; }
+  .sos-detail-row{ display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--border); font-size:13px; }
+  .sos-detail-row:last-child{ border-bottom:none; }
+  .sos-detail-row .k{ color:var(--text-dim); }
+  .sos-detail-row .v{ font-family:"JetBrains Mono",monospace; }
+  .sos-detail-row .v a{ color:var(--accent-bright); text-decoration:none; }
+
+  .report-list{ max-height:220px; overflow-y:auto; }
+  .report-row{
+    background:var(--panel-raised); border:1px solid var(--border); border-radius:6px;
+    padding:9px 10px; margin-bottom:6px; font-size:12px; display:flex; flex-wrap:wrap; align-items:center; gap:8px;
+    cursor:pointer; transition:border-color .15s ease;
+  }
+  .report-row:hover{ border-color:var(--accent-bright); }
+  .report-row .dot{ width:9px; height:9px; border-radius:50%; flex:none; }
+  .report-row .rmeta{ flex:1; min-width:120px; }
+  .report-row .rtime{ color:var(--text-dim); font-size:10.5px; font-family:"JetBrains Mono",monospace; }
+  .report-row .rcontrols{ display:flex; align-items:center; gap:6px; flex:1 1 100%; justify-content:flex-end; }
+  select.status-select{
+    background:var(--panel); border:1px solid var(--border); color:var(--text);
+    font-size:11px; border-radius:5px; padding:3px 4px; font-family:"Inter",sans-serif;
+  }
+  .delete-case-btn{
+    flex:none; background:none; border:1px solid var(--border); color:var(--text-dim);
+    width:22px; height:22px; border-radius:5px; font-size:15px; line-height:1;
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .delete-case-btn:hover{ border-color:var(--danger); color:var(--danger-bright); }
+  .urgency-badge{
+    flex:none; font-size:9.5px; text-transform:uppercase; letter-spacing:0.04em;
+    padding:2px 6px; border-radius:20px; border:1px solid; font-family:"Inter",sans-serif;
+  }
+
+  .case-card{
+    background:var(--panel-raised); border:1px solid var(--border); border-radius:8px;
+    padding:14px; margin-bottom:12px; transition:border-color .15s ease;
+  }
+  .case-card:hover{ border-color:var(--accent-bright); }
+  .cc-top{ display:flex; align-items:flex-start; gap:10px; }
+  .cc-top .dot{ width:9px; height:9px; border-radius:50%; flex:none; margin-top:5px; }
+  .cc-title{ flex:1; min-width:0; }
+  .cc-name{ font-size:13.5px; font-weight:600; }
+  .cc-desc{
+    font-size:12.5px; color:var(--text); line-height:1.5; margin-top:10px;
+    padding-top:10px; border-top:1px solid var(--border);
+  }
+  .cc-controls{ display:flex; align-items:center; gap:8px; margin-top:12px; }
+  .cc-dispatch{ margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
+  .cc-dispatch-label{ font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-dim); margin-bottom:7px; }
+  .cc-dispatch-btns{ display:flex; flex-wrap:wrap; gap:6px; }
+  .dispatch-btn{
+    background:none; border:1px solid var(--border); color:var(--text-dim);
+    font-size:11px; padding:5px 10px; border-radius:20px; cursor:pointer; font-family:"Inter",sans-serif;
+    transition:all .15s ease;
+  }
+  .dispatch-btn:hover{ border-color:var(--agency-color); color:var(--text); }
+  .dispatch-btn.active{ background:var(--agency-color); border-color:var(--agency-color); color:#fff; font-weight:600; }
+
+  .case-panel{
+    background:var(--panel); border-left:1px solid var(--border);
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  .case-panel-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px; border-bottom:1px solid var(--border); flex:none;
+  }
+  .case-panel-head h3{ font-size:15px; margin:0; }
+  .case-controls{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:12px 18px 0; flex:none; }
+  .case-cards{ flex:1; overflow-y:auto; padding:14px 18px 18px; }
+
+  .map-area{ position:relative; }
+  .map-close-mobile{
+    display:none; position:absolute; bottom:14px; left:50%; transform:translateX(-50%); z-index:400;
+    background:var(--panel); border:1px solid var(--border); color:var(--text);
+    padding:10px 18px; border-radius:8px; font-size:12px; cursor:pointer;
+  }
+  .map-area.show-mobile .map-close-mobile{ display:block; }
+  #map{ height:100%; width:100%; background:#0E0E12; }
+  .map-topbar{
+    position:absolute; top:14px; left:14px; z-index:400;
+    background:rgba(22,22,27,0.92); border:1px solid var(--border); border-radius:8px;
+    padding:8px 14px; font-size:12px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-dim); backdrop-filter:blur(4px);
+  }
+  .logout-btn{
+    position:fixed; bottom:18px; right:18px; z-index:600;
+    background:rgba(255,46,46,0.12); border:1px solid var(--danger); color:var(--danger-bright);
+    padding:10px 16px; border-radius:8px; font-size:12px; cursor:pointer; font-family:"Inter",sans-serif;
+    text-transform:uppercase; letter-spacing:0.04em;
+    box-shadow:0 8px 24px -6px rgba(0,0,0,0.6);
+  }
+  .logout-btn:hover{ background:var(--danger); color:#fff; }
+
+  /* Leaflet popup restyle */
+  .leaflet-popup-content-wrapper{ background:var(--panel); color:var(--text); border-radius:8px; }
+  .leaflet-popup-tip{ background:var(--panel); }
+  .popup-card{ display:flex; gap:10px; align-items:flex-start; min-width:180px; }
+  .popup-card img{ width:44px; height:44px; border-radius:6px; object-fit:cover; border:1px solid var(--border); }
+  .popup-card .p-name{ font-family:"Oswald",sans-serif; font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em; }
+  .popup-card .p-meta{ font-size:11px; color:var(--text-dim); margin-top:3px; }
+  .popup-card .p-pill{ display:inline-block; margin-top:6px; font-size:10px; text-transform:uppercase; letter-spacing:0.04em; padding:1px 7px; border-radius:20px; color:#fff; }
+
+  .sos-marker{
+    width:20px; height:20px; border-radius:50%; background:var(--danger);
+    box-shadow:0 0 0 0 rgba(255,46,46,0.6); animation:mpulse 1.6s ease-in-out infinite;
+    border:2px solid #fff;
+  }
+  @keyframes mpulse{
+    0%{ box-shadow:0 0 0 0 rgba(255,46,46,.6); }
+    70%{ box-shadow:0 0 0 18px rgba(255,46,46,0); }
+    100%{ box-shadow:0 0 0 0 rgba(255,46,46,0); }
+  }
+  .case-marker{ width:16px; height:16px; border-radius:50%; border:2px solid #fff; }
+</style>
+</head>
+<body>
+
+<!-- ===================== LOGIN ===================== -->
+<div class="login-wrap" id="login-wrap">
+  <div class="login-card">
+    <div class="wolf-mark">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="20,8 38,32 50,22 62,32 80,8 88,50 50,96 12,50" fill="var(--text)" />
+        <circle class="wolf-eye" cx="38" cy="47" r="4.2" />
+        <circle class="wolf-eye" cx="62" cy="47" r="4.2" />
+      </svg>
+    </div>
+    <h2>WolfWatch Admin</h2>
+    <div class="sub">Command &amp; response console</div>
+    <label for="ad-user">Username</label>
+    <input type="text" id="ad-user" placeholder="Username" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+    <label for="ad-pass">Password</label>
+    <input type="password" id="ad-pass" placeholder="Password" autocomplete="off" />
+    <button type="button" id="ad-pass-toggle" style="display:block; margin:6px 0 0 auto; background:none; border:none; color:var(--text-dim); font-size:11px; cursor:pointer; text-transform:uppercase; letter-spacing:0.05em;">Show</button>
+    <div class="login-error" id="ad-error"></div>
+    <button id="btn-admin-login">Log in</button>
+  </div>
+</div>
+
+<!-- ===================== DASHBOARD ===================== -->
+<div class="shell" id="shell">
+  <div class="sidebar">
+    <div class="side-header">
+      <div class="wolf-mark">
+        <svg id="wolf-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="20,8 38,32 50,22 62,32 80,8 88,50 50,96 12,50" fill="var(--text)" />
+          <circle class="wolf-eye" cx="38" cy="47" r="4.2" />
+          <circle class="wolf-eye" cx="62" cy="47" r="4.2" />
+        </svg>
+      </div>
+      <div class="brand">WolfWatch <small>Admin console</small></div>
+      <button id="btn-toggle-map-mobile" class="mobile-map-toggle">Map</button>
+    </div>
+
+    <div class="side-body">
+      <div class="stat-row">
+        <div class="stat-box stat-clickable" id="stat-citizens-box" title="View registered citizens">
+          <div class="num" id="stat-citizens">0</div><div class="label">Citizens</div>
+        </div>
+        <div class="stat-box"><div class="num" id="stat-open">0</div><div class="label">Open cases</div></div>
+        <div class="stat-box"><div class="num" id="stat-sos">0</div><div class="label">Live SOS</div></div>
+      </div>
+
+      <div class="side-section-title">Live SOS</div>
+      <div class="report-list" id="sos-list"></div>
+
+      <div class="side-section-title">Send urgent message</div>
+      <textarea id="msg-text" placeholder="e.g. Curfew in effect for Ward 4 from 8pm..."></textarea>
+      <label class="urgent-toggle"><input type="checkbox" id="msg-urgent" checked /> Mark as urgent (flags on citizen app)</label>
+      <button class="send-btn" id="btn-send-msg">Broadcast to all citizens</button>
+      <div class="msg-log" id="msg-log"></div>
+
+      <div class="side-section-title">Case colour code</div>
+      <div class="legend">
+        <div class="row"><span class="swatch" style="background:#FF2E2E;"></span> New — unassigned</div>
+        <div class="row"><span class="swatch" style="background:#F4631E;"></span> Active — responder en route</div>
+        <div class="row"><span class="swatch" style="background:#FFB703;"></span> Monitoring</div>
+        <div class="row"><span class="swatch" style="background:#3FBE6B;"></span> Resolved</div>
+        <div class="row"><span class="swatch" style="background:#FF1E1E;"></span> Live SOS (pulsing)</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="map-area" id="map-area">
+    <div class="map-topbar">Live map — active citizens &amp; reported cases</div>
+    <button class="logout-btn" id="btn-admin-logout">Log out</button>
+    <button class="map-close-mobile" id="btn-close-map-mobile">&times; Close map</button>
+    <div id="map"></div>
+  </div>
+
+  <div class="case-panel">
+    <div class="case-panel-head">
+      <h3 id="cases-list-title">Open cases</h3>
+      <button class="add-case-btn" id="btn-add-case" title="Add a case manually">+ Add case</button>
+    </div>
+    <div class="case-controls">
+      <label class="mini-toggle"><input type="checkbox" id="show-resolved" /> show resolved too</label>
+      <select id="sort-cases" class="status-select" title="Sort cases">
+        <option value="urgency">Sort: urgency</option>
+        <option value="newest">Sort: newest</option>
+      </select>
+    </div>
+    <div class="case-cards" id="report-list"></div>
+  </div>
+</div>
+
+<!-- ===================== CITIZENS MODAL ===================== -->
+<div class="modal-overlay" id="citizens-modal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3>Registered citizens</h3>
+      <button class="modal-close" id="citizens-modal-close">&times;</button>
+    </div>
+    <div class="citizens-list" id="citizens-list"></div>
+  </div>
+</div>
+
+<!-- ===================== ADD CASE MODAL ===================== -->
+<div class="modal-overlay" id="add-case-modal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3>Log a case manually</h3>
+      <button class="modal-close" id="add-case-close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label for="ac-citizen">Citizen (optional)</label>
+      <select id="ac-citizen"><option value="">— Walk-in / phone report —</option></select>
+
+      <label for="ac-reporter">Reporter name</label>
+      <input type="text" id="ac-reporter" placeholder="Name of person reporting (if not a registered citizen)" />
+
+      <label for="ac-crime">Crime type</label>
+      <select id="ac-crime"></select>
+
+      <label for="ac-urgency">Urgency</label>
+      <select id="ac-urgency">
+        <option value="critical">Critical</option>
+        <option value="high">High</option>
+        <option value="medium" selected>Medium</option>
+        <option value="low">Low</option>
+      </select>
+
+      <label for="ac-desc">Description</label>
+      <textarea id="ac-desc" placeholder="What happened..."></textarea>
+
+      <div style="display:flex; gap:10px;">
+        <div style="flex:1;">
+          <label for="ac-lat">Latitude (optional)</label>
+          <input type="text" id="ac-lat" placeholder="e.g. 6.5244" />
+        </div>
+        <div style="flex:1;">
+          <label for="ac-lng">Longitude (optional)</label>
+          <input type="text" id="ac-lng" placeholder="e.g. 3.3792" />
+        </div>
+      </div>
+      <div class="error-text" id="ac-error"></div>
+      <button class="send-btn" id="btn-ac-submit" style="margin-top:16px;">Log case</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SOS APPLICANT MODAL ===================== -->
+<div class="modal-overlay" id="sos-detail-modal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3>SOS applicant</h3>
+      <button class="modal-close" id="sos-detail-close">&times;</button>
+    </div>
+    <div class="modal-body" id="sos-detail-body"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+/**
+ * WolfWatch shared data layer.
+ * ----------------------------
+ * This file is loaded by BOTH citizen.html and admin.html.
+ * For the two apps to talk to each other in a browser (no server),
+ * they must be served from the same origin — e.g. run:
+ *     python3 -m http.server 8000
+ * inside this folder, then open:
+ *     http://localhost:8000/citizen.html
+ *     http://localhost:8000/admin.html
+ * Opening the files directly as file:// in two tabs will NOT share
+ * data in most modern browsers, because file:// pages are treated
+ * as separate origins for storage.
+ *
+ * In production this whole file is replaced by real HTTP calls to
+ * the REST API + SQL database described in schema.sql. Every function
+ * below is written to map 1:1 onto a future endpoint, so swapping
+ * localStorage for `fetch()` later is mechanical.
+ */
+
+const WOLF_DB_KEY = "wolfwatch_db_v1";
+
+const CRIME_TYPES = [
+  { id: "armed-robbery", label: "Armed Robbery", color: "#8B0000", urgency: "critical" },
+  { id: "robbery",       label: "Robbery / Mugging", color: "#E63946", urgency: "high" },
+  { id: "assault",       label: "Assault", color: "#F4631E", urgency: "high" },
+  { id: "kidnapping",    label: "Kidnapping", color: "#C9184A", urgency: "critical" },
+  { id: "domestic",      label: "Domestic Violence", color: "#7B2CBF", urgency: "high" },
+  { id: "harassment",    label: "Harassment / Stalking", color: "#FF6B9D", urgency: "medium" },
+  { id: "theft",         label: "Theft / Burglary", color: "#FFB703", urgency: "medium" },
+  { id: "fraud",         label: "Fraud / Scam", color: "#5C6BC0", urgency: "low" },
+  { id: "fire",          label: "Fire Emergency", color: "#FF4500", urgency: "critical" },
+  { id: "medical",       label: "Medical Emergency", color: "#2A9D8F", urgency: "critical" },
+  { id: "accident",      label: "Road Accident", color: "#457B9D", urgency: "high" },
+  { id: "vandalism",     label: "Vandalism", color: "#8D6E63", urgency: "low" },
+  { id: "missing",       label: "Missing Person", color: "#FFD60A", urgency: "high" },
+  { id: "other",         label: "Other Emergency", color: "#6C757D", urgency: "medium" },
+];
+
+// Urgency levels used to triage and sort cases on the admin side.
+const URGENCY_LEVELS = {
+  critical: { label: "Critical", rank: 4, color: "#FF2E2E" },
+  high:     { label: "High",     rank: 3, color: "#F4631E" },
+  medium:   { label: "Medium",   rank: 2, color: "#FFB703" },
+  low:      { label: "Low",      rank: 1, color: "#6E92C7" },
+};
+
+// A citizen counts as "online" if their app has pinged within this window.
+const ONLINE_WINDOW_MS = 45000;
+
+// Responder agencies a case can be dispatched to.
+const RESPONDER_AGENCIES = [
+  { id: "police",       label: "Police",        color: "#4A6FA5" },
+  { id: "military",     label: "Soldier",       color: "#6C7A3F" },
+  { id: "civil-defence", label: "Civil Defence", color: "#D9A441" },
+  { id: "fire",         label: "Fire Service",  color: "#FF4500" },
+  { id: "hospital",     label: "Hospital",      color: "#2A9D8F" },
+];
+
+// Status → colour code shown consistently across both apps (case workflow stage,
+// distinct from the crime-type colour used for the dot on each chip/marker).
+const STATUS_COLORS = {
+  new: "#FF2E2E",        // just reported, unassigned — ember
+  active: "#F4631E",     // a responder is en route — hot orange
+  monitoring: "#FFB703", // under watch / low severity — amber
+  resolved: "#3FBE6B",   // closed — green
+  sos: "#FF1E1E",        // live SOS — bright red, pulses on map
+};
+
+function _read() {
+  const raw = localStorage.getItem(WOLF_DB_KEY);
+  if (!raw) {
+    const seed = { citizens: [], reports: [], sosAlerts: [], messages: [] };
+    localStorage.setItem(WOLF_DB_KEY, JSON.stringify(seed));
+    return seed;
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    const seed = { citizens: [], reports: [], sosAlerts: [], messages: [] };
+    localStorage.setItem(WOLF_DB_KEY, JSON.stringify(seed));
+    return seed;
+  }
+}
+
+function _write(db) {
+  try {
+    localStorage.setItem(WOLF_DB_KEY, JSON.stringify(db));
+  } catch (e) {
+    throw new Error("Browser storage is full — try smaller photos or clear old data.");
+  }
+  // Let any open tab (e.g. the admin dashboard) know data changed.
+  window.dispatchEvent(new CustomEvent("wolfwatch:update"));
+}
+
+function _id(prefix) {
+  return prefix + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+const WolfDB = {
+  CRIME_TYPES,
+  STATUS_COLORS,
+  URGENCY_LEVELS,
+  RESPONDER_AGENCIES,
+
+  // ---- Citizens -----------------------------------------------------
+  signUp({ firstName, middleName, lastName, nin, phone, password, ninPhotoDataUrl, passportPhotoDataUrl }) {
+    const db = _read();
+    if (db.citizens.some((c) => c.nin === nin)) {
+      throw new Error("An account with this NIN already exists.");
+    }
+    const fullName = [firstName, middleName, lastName].filter(Boolean).join(" ");
+    const citizen = {
+      id: _id("cit"),
+      firstName,
+      middleName: middleName || "",
+      lastName,
+      fullName,
+      nin,
+      phone,
+      password, // demo only — a real backend must hash this (see schema.sql)
+      ninPhoto: ninPhotoDataUrl,
+      passportPhoto: passportPhotoDataUrl,
+      createdAt: new Date().toISOString(),
+      lastKnownLocation: null,
+    };
+    db.citizens.push(citizen);
+    _write(db);
+    return citizen;
+  },
+
+  login(nin, password) {
+    const db = _read();
+    const citizen = db.citizens.find((c) => c.nin === nin && c.password === password);
+    if (!citizen) throw new Error("NIN or password is incorrect.");
+    return citizen;
+  },
+
+  getCitizen(id) {
+    return _read().citizens.find((c) => c.id === id) || null;
+  },
+
+  allCitizens() {
+    return _read().citizens.slice();
+  },
+
+  isOnline(citizen) {
+    if (!citizen || !citizen.online || !citizen.lastSeenAt) return false;
+    return Date.now() - Date.parse(citizen.lastSeenAt) < ONLINE_WINDOW_MS;
+  },
+
+  // Called every few seconds by the citizen app while logged in.
+  heartbeat(citizenId) {
+    const db = _read();
+    const c = db.citizens.find((x) => x.id === citizenId);
+    if (c) {
+      c.online = true;
+      c.lastSeenAt = new Date().toISOString();
+      _write(db);
+    }
+  },
+
+  goOffline(citizenId) {
+    const db = _read();
+    const c = db.citizens.find((x) => x.id === citizenId);
+    if (c) {
+      c.online = false;
+      c.lastSeenAt = new Date().toISOString();
+      _write(db);
+    }
+  },
+
+  updateLocation(citizenId, lat, lng) {
+    const db = _read();
+    const c = db.citizens.find((x) => x.id === citizenId);
+    if (c) {
+      c.lastKnownLocation = { lat, lng, at: new Date().toISOString() };
+      _write(db);
+    }
+  },
+
+  // ---- Crime reports --------------------------------------------------
+  fileReport({ citizenId, crimeType, description, lat, lng, urgency, status, source, reporterName }) {
+    const db = _read();
+    const ct = CRIME_TYPES.find((c) => c.id === crimeType);
+    const report = {
+      id: _id("rpt"),
+      citizenId: citizenId || null,
+      reporterName: reporterName || "",
+      source: source || "citizen",
+      crimeType,
+      description,
+      lat: lat == null ? null : lat,
+      lng: lng == null ? null : lng,
+      urgency: urgency || (ct && ct.urgency) || "medium",
+      status: status || "new",
+      createdAt: new Date().toISOString(),
+    };
+    db.reports.push(report);
+    _write(db);
+    return report;
+  },
+
+  setReportStatus(reportId, status) {
+    const db = _read();
+    const r = db.reports.find((x) => x.id === reportId);
+    if (r) {
+      r.status = status;
+      _write(db);
+    }
+  },
+
+  deleteReport(reportId) {
+    const db = _read();
+    db.reports = db.reports.filter((x) => x.id !== reportId);
+    _write(db);
+  },
+
+  setReportUrgency(reportId, urgency) {
+    const db = _read();
+    const r = db.reports.find((x) => x.id === reportId);
+    if (r) {
+      r.urgency = urgency;
+      _write(db);
+    }
+  },
+
+  urgencyOf(report) {
+    if (report.urgency && URGENCY_LEVELS[report.urgency]) return report.urgency;
+    const ct = CRIME_TYPES.find((c) => c.id === report.crimeType);
+    return (ct && ct.urgency) || "medium";
+  },
+
+  // Toggles one responder agency on/off for a case. dispatchedTo is an array
+  // of agency ids so a case can be sent to more than one (e.g. fire + hospital).
+  toggleReportDispatch(reportId, agencyId) {
+    const db = _read();
+    const r = db.reports.find((x) => x.id === reportId);
+    if (!r) return;
+    if (!Array.isArray(r.dispatchedTo)) r.dispatchedTo = [];
+    const idx = r.dispatchedTo.indexOf(agencyId);
+    if (idx === -1) {
+      r.dispatchedTo.push(agencyId);
+      r.dispatchLog = r.dispatchLog || [];
+      r.dispatchLog.push({ agencyId, at: new Date().toISOString() });
+    } else {
+      r.dispatchedTo.splice(idx, 1);
+    }
+    _write(db);
+  },
+
+  allReports() {
+    return _read().reports.slice().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  },
+
+  reportsFor(citizenId) {
+    return this.allReports().filter((r) => r.citizenId === citizenId);
+  },
+
+  // ---- SOS ------------------------------------------------------------
+  raiseSOS({ citizenId, lat, lng }) {
+    const db = _read();
+    const alert = {
+      id: _id("sos"),
+      citizenId,
+      lat,
+      lng,
+      status: "sos",
+      createdAt: new Date().toISOString(),
+      resolved: false,
+    };
+    db.sosAlerts.push(alert);
+    _write(db);
+    return alert;
+  },
+
+  resolveSOS(alertId) {
+    const db = _read();
+    const a = db.sosAlerts.find((x) => x.id === alertId);
+    if (a) {
+      a.resolved = true;
+      _write(db);
+    }
+  },
+
+  activeSOS() {
+    return _read().sosAlerts.filter((a) => !a.resolved);
+  },
+
+  // ---- Admin broadcast messages ----------------------------------------
+  sendMessage({ text, urgent }) {
+    const db = _read();
+    const msg = {
+      id: _id("msg"),
+      text,
+      urgent: !!urgent,
+      createdAt: new Date().toISOString(),
+    };
+    db.messages.push(msg);
+    _write(db);
+    return msg;
+  },
+
+  allMessages() {
+    return _read().messages.slice().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  },
+
+  // ---- Admin auth (hardcoded per spec) ---------------------------------
+  adminLogin(username, password) {
+    return String(username).trim().toLowerCase() === "lino" && String(password).trim() === "9876";
+  },
+
+  onUpdate(cb) {
+    window.addEventListener("wolfwatch:update", cb);
+    window.addEventListener("storage", cb); // fires across tabs/windows
+  },
+};
+
+</script>
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  $("ad-pass-toggle").addEventListener("click", () => {
+    const field = $("ad-pass");
+    const btn = $("ad-pass-toggle");
+    if (field.type === "password") { field.type = "text"; btn.textContent = "Hide"; }
+    else { field.type = "password"; btn.textContent = "Show"; }
+  });
+
+  // ---------------- Login (hardcoded lino / 9876) ----------------
+  function attemptAdminLogin(){
+    const uRaw = $("ad-user").value;
+    const pRaw = $("ad-pass").value;
+    const u = uRaw.trim();
+    const p = pRaw;
+    if (WolfDB.adminLogin(u, p)) {
+      $("ad-error").textContent = "";
+      $("login-wrap").style.display = "none";
+      $("shell").classList.add("active");
+      initMap();
+      renderAll();
+    } else {
+      // Show exactly what was received (never the password itself) so a phone
+      // keyboard swap (autocapitalize, autocorrect, stray space) is visible
+      // instead of guessed at.
+      $("ad-error").innerHTML =
+        `Incorrect username or password.<br>` +
+        `Username received: "${escapeHtmlAd(uRaw)}" (length ${uRaw.length})<br>` +
+        `Password length received: ${pRaw.length}`;
+    }
+  }
+  function escapeHtmlAd(s){
+    return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+  $("btn-admin-login").addEventListener("click", attemptAdminLogin);
+  ["ad-user", "ad-pass"].forEach(id => {
+    $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") attemptAdminLogin(); });
+  });
+  $("btn-admin-logout").addEventListener("click", () => {
+    $("shell").classList.remove("active");
+    $("login-wrap").style.display = "flex";
+    $("ad-pass").value = "";
+  });
+  $("btn-toggle-map-mobile").addEventListener("click", () => {
+    $("map-area").classList.add("show-mobile");
+    if (map) setTimeout(() => map.invalidateSize(), 100);
+  });
+  $("btn-close-map-mobile").addEventListener("click", () => {
+    $("map-area").classList.remove("show-mobile");
+  });
+
+  // ---------------- Map (Leaflet + CARTO dark raster tiles, API key required) ----------------
+  let map, markersLayer, mapAvailable = true;
+  function initMap(){
+    if (map || !mapAvailable) { if (map) setTimeout(() => map.invalidateSize(), 50); return; }
+    if (typeof L === "undefined") {
+      // Leaflet failed to load (e.g. no internet reaching the CDN) — don't let
+      // this break the rest of the dashboard; show a plain message instead.
+      mapAvailable = false;
+      document.getElementById("map").innerHTML =
+        '<div style="padding:20px;color:#8592A6;font-size:13px;">Map couldn\'t load (no connection to the map tile provider). Everything else in the dashboard still works.</div>';
+      return;
+    }
+    map = L.map("map", { zoomControl: true }).setView([9.0820, 8.6753], 6); // Nigeria-wide default view
+    // CARTO "dark matter" raster basemap. The key is passed as a `key` query
+    // parameter; without it the tiles show an "API key required" watermark.
+    const CARTO_KEY = "cb1_4fs1_1_13446dc39333298e95a2e15f";
+    L.tileLayer("https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=" + CARTO_KEY, {
+      maxZoom: 20,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+    }).addTo(map);
+    markersLayer = L.layerGroup().addTo(map);
+    setTimeout(() => map.invalidateSize(), 50);
+  }
+
+  function statusColor(status){ return WolfDB.STATUS_COLORS[status] || "#8592A6"; }
+
+  function popupHtml(citizen, label, status, nameOverride){
+    const photo = citizen ? citizen.passportPhoto : "";
+    const name = citizen ? citizen.fullName : (nameOverride || "Unknown citizen");
+    const color = statusColor(status);
+    return `<div class="popup-card">
+        ${photo ? `<img src="${photo}" alt="">` : ""}
+        <div>
+          <div class="p-name">${escapeHtml(name)}</div>
+          <div class="p-meta">${escapeHtml(label)}</div>
+          <span class="p-pill" style="background:${color}">${status.toUpperCase()}</span>
+        </div>
+      </div>`;
+  }
+
+  function escapeHtml(s){
+    return String(s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+
+  function renderMap(){
+    if (!mapAvailable || !markersLayer) return;
+    markersLayer.clearLayers();
+    const reports = WolfDB.allReports();
+    const sosAlerts = WolfDB.activeSOS();
+    const bounds = [];
+
+    reports.forEach(r => {
+      if (r.lat == null || r.lng == null) return;
+      const citizen = WolfDB.getCitizen(r.citizenId);
+      const ct = WolfDB.CRIME_TYPES.find(c => c.id === r.crimeType);
+      const color = statusColor(r.status);
+      const icon = L.divIcon({
+        className: "",
+        html: `<div class="case-marker" style="background:${color}"></div>`,
+        iconSize: [16, 16],
+      });
+      L.marker([r.lat, r.lng], { icon })
+        .bindPopup(popupHtml(citizen, ct ? ct.label : r.crimeType, r.status, r.reporterName))
+        .addTo(markersLayer);
+      bounds.push([r.lat, r.lng]);
+    });
+
+    sosAlerts.forEach(a => {
+      if (a.lat == null || a.lng == null) return;
+      const citizen = WolfDB.getCitizen(a.citizenId);
+      const icon = L.divIcon({
+        className: "",
+        html: `<div class="sos-marker"></div>`,
+        iconSize: [20, 20],
+      });
+      L.marker([a.lat, a.lng], { icon })
+        .bindPopup(popupHtml(citizen, "LIVE SOS ALERT", "sos"))
+        .addTo(markersLayer);
+      bounds.push([a.lat, a.lng]);
+    });
+
+    if (bounds.length) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 });
+  }
+
+  // ---------------- Messaging ----------------
+  $("btn-send-msg").addEventListener("click", () => {
+    const text = $("msg-text").value.trim();
+    if (!text) return;
+    WolfDB.sendMessage({ text, urgent: $("msg-urgent").checked });
+    $("msg-text").value = "";
+    renderMessages();
+  });
+
+  function renderMessages(){
+    const log = $("msg-log");
+    const messages = WolfDB.allMessages();
+    log.innerHTML = "";
+    messages.slice(0, 10).forEach(m => {
+      const div = document.createElement("div");
+      div.className = "msg-item";
+      div.innerHTML = `<div>${escapeHtml(m.text)}</div><div class="meta">${m.urgent ? "URGENT · " : ""}${new Date(m.createdAt).toLocaleString()}</div>`;
+      log.appendChild(div);
+    });
+  }
+
+  // ---------------- Reports list + status control ----------------
+  function renderReportList(){
+    const list = $("report-list");
+    const showResolved = $("show-resolved").checked;
+    const sortBy = $("sort-cases").value;
+    let reports = WolfDB.allReports().filter(r => showResolved || r.status !== "resolved");
+    if (sortBy === "urgency") {
+      reports = reports.slice().sort((a, b) => {
+        const ra = WolfDB.URGENCY_LEVELS[WolfDB.urgencyOf(a)].rank;
+        const rb = WolfDB.URGENCY_LEVELS[WolfDB.urgencyOf(b)].rank;
+        if (rb !== ra) return rb - ra;
+        return a.createdAt < b.createdAt ? 1 : -1;
+      });
+    }
+    list.innerHTML = "";
+    if (!reports.length) {
+      list.innerHTML = `<div style="color:var(--text-dim); font-size:12px;">${showResolved ? "No cases reported yet." : "No open cases right now."}</div>`;
+      return;
+    }
+    reports.forEach(r => {
+      const citizen = WolfDB.getCitizen(r.citizenId);
+      const ct = WolfDB.CRIME_TYPES.find(c => c.id === r.crimeType);
+      const urgency = WolfDB.urgencyOf(r);
+      const uInfo = WolfDB.URGENCY_LEVELS[urgency];
+      const reporterName = citizen ? citizen.fullName : (r.reporterName || "Unknown / walk-in");
+      const phone = citizen ? citizen.phone : "";
+      const dispatchedTo = Array.isArray(r.dispatchedTo) ? r.dispatchedTo : [];
+      const card = document.createElement("div");
+      card.className = "case-card";
+      card.innerHTML = `
+        <div class="cc-top">
+          <span class="dot" style="background:${statusColor(r.status)}" title="Status: ${r.status}"></span>
+          <div class="cc-title">
+            <div class="cc-name">${escapeHtml(reporterName)}${phone ? ` · <a href="tel:${escapeHtml(phone)}" style="color:inherit;">${escapeHtml(phone)}</a>` : ""}</div>
+            <div class="rtime">${ct ? ct.label : r.crimeType} · ${new Date(r.createdAt).toLocaleString()}</div>
+          </div>
+          <span class="urgency-badge" style="background:${uInfo.color}1a; color:${uInfo.color}; border-color:${uInfo.color}55;">${uInfo.label}</span>
+        </div>
+        ${r.description ? `<div class="cc-desc">${escapeHtml(r.description)}</div>` : ""}
+        <div class="cc-controls">
+          <select class="status-select" data-id="${r.id}">
+            <option value="new"${r.status==="new"?" selected":""}>New</option>
+            <option value="active"${r.status==="active"?" selected":""}>Active</option>
+            <option value="monitoring"${r.status==="monitoring"?" selected":""}>Monitoring</option>
+            <option value="resolved"${r.status==="resolved"?" selected":""}>Resolved</option>
+          </select>
+          <button class="delete-case-btn" data-id="${r.id}" title="Delete case">&times;</button>
+        </div>
+        <div class="cc-dispatch">
+          <div class="cc-dispatch-label">Send to:</div>
+          <div class="cc-dispatch-btns">
+            ${WolfDB.RESPONDER_AGENCIES.map(a => `
+              <button class="dispatch-btn${dispatchedTo.includes(a.id) ? " active" : ""}" data-id="${r.id}" data-agency="${a.id}"
+                style="--agency-color:${a.color};">${a.label}</button>
+            `).join("")}
+          </div>
+        </div>`;
+      if (r.lat != null && r.lng != null) {
+        card.querySelector(".cc-top").style.cursor = "pointer";
+        card.querySelector(".cc-top").addEventListener("click", (e) => {
+          if (e.target.tagName === "A") return;
+          if (map) map.flyTo([r.lat, r.lng], 15, { duration: 0.6 });
+        });
+      }
+      list.appendChild(card);
+    });
+    list.querySelectorAll(".status-select").forEach(sel => {
+      sel.addEventListener("change", () => {
+        WolfDB.setReportStatus(sel.dataset.id, sel.value);
+        renderAll();
+      });
+    });
+    list.querySelectorAll(".delete-case-btn").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (confirm("Delete this case permanently? This can't be undone.")) {
+          WolfDB.deleteReport(btn.dataset.id);
+          renderAll();
+        }
+      });
+    });
+    list.querySelectorAll(".dispatch-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        WolfDB.toggleReportDispatch(btn.dataset.id, btn.dataset.agency);
+        renderReportList();
+      });
+    });
+  }
+  $("show-resolved").addEventListener("change", renderReportList);
+  $("sort-cases").addEventListener("change", renderReportList);
+
+  // ---------------- Live SOS panel ----------------
+  function renderSosList(){
+    const list = $("sos-list");
+    const alerts = WolfDB.activeSOS();
+    list.innerHTML = "";
+    if (!alerts.length) {
+      list.innerHTML = '<div style="color:var(--text-dim); font-size:12px;">No live SOS alerts right now.</div>';
+      return;
+    }
+    alerts.slice().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).forEach(a => {
+      const citizen = WolfDB.getCitizen(a.citizenId);
+      const row = document.createElement("div");
+      row.className = "sos-row";
+      row.innerHTML = `
+        ${citizen && citizen.passportPhoto ? `<img src="${citizen.passportPhoto}" alt="">` : ""}
+        <div class="sr-info">
+          <div class="sr-name">${citizen ? escapeHtml(citizen.fullName) : "Unknown citizen"}</div>
+          <div class="sr-meta">tap for details · ${new Date(a.createdAt).toLocaleTimeString()}</div>
+        </div>
+        <button data-id="${a.id}">Mark safe</button>`;
+      row.querySelector(".sr-info").style.cursor = "pointer";
+      row.querySelector(".sr-info").addEventListener("click", () => openSosDetail(a, citizen));
+      row.querySelector("button").addEventListener("click", () => {
+        WolfDB.resolveSOS(a.id);
+        renderAll();
+      });
+      list.appendChild(row);
+    });
+  }
+
+  // ---------------- SOS applicant detail (passport photo + phone; the NIN slip image is never shown to admin) ----------------
+  function openSosDetail(alert, citizen){
+    const body = $("sos-detail-body");
+    if (!citizen) {
+      body.innerHTML = '<div style="color:var(--text-dim); font-size:13px;">No citizen record found for this alert.</div>';
+    } else {
+      body.innerHTML = `
+        <div class="sos-detail-grid" style="max-width:150px; margin:0 auto 14px;">
+          <div class="photo-block">
+            ${citizen.passportPhoto ? `<img src="${citizen.passportPhoto}" alt="Passport photo">` : `<div style="aspect-ratio:1;border-radius:8px;border:1px solid var(--border);"></div>`}
+            <div class="photo-label">Passport photo</div>
+          </div>
+        </div>
+        <div class="sos-detail-row"><span class="k">Name</span><span class="v">${escapeHtml(citizen.fullName)}</span></div>
+        <div class="sos-detail-row"><span class="k">Phone</span><span class="v">${citizen.phone ? `<a href="tel:${escapeHtml(citizen.phone)}">${escapeHtml(citizen.phone)}</a>` : "not on file"}</span></div>
+        <div class="sos-detail-row"><span class="k">NIN</span><span class="v">${escapeHtml(String(citizen.nin))}</span></div>
+        <div class="sos-detail-row"><span class="k">SOS raised</span><span class="v">${new Date(alert.createdAt).toLocaleString()}</span></div>
+        <div class="sos-detail-row"><span class="k">Location</span><span class="v">${alert.lat != null ? alert.lat.toFixed(5) + ", " + alert.lng.toFixed(5) : "not available"}</span></div>
+        ${alert.lat != null ? `<button class="send-btn" id="sos-detail-locate" style="margin-top:12px;">Locate on map</button>` : ""}`;
+      if (alert.lat != null) {
+        $("sos-detail-locate").addEventListener("click", () => {
+          $("sos-detail-modal").classList.remove("show");
+          if (map) map.flyTo([alert.lat, alert.lng], 16, { duration: 0.6 });
+        });
+      }
+    }
+    $("sos-detail-modal").classList.add("show");
+  }
+  $("sos-detail-close").addEventListener("click", () => $("sos-detail-modal").classList.remove("show"));
+  $("sos-detail-modal").addEventListener("click", (e) => {
+    if (e.target.id === "sos-detail-modal") $("sos-detail-modal").classList.remove("show");
+  });
+
+  // ---------------- Citizens modal (with live online status) ----------------
+  function renderCitizensList(){
+    const list = $("citizens-list");
+    const citizens = WolfDB.allCitizens();
+    list.innerHTML = "";
+    if (!citizens.length) {
+      list.innerHTML = '<div style="color:var(--text-dim); font-size:12px;">No citizens have signed up yet.</div>';
+      return;
+    }
+    citizens.slice().reverse().forEach(c => {
+      const online = WolfDB.isOnline(c);
+      const row = document.createElement("div");
+      row.className = "citizen-row";
+      row.innerHTML = `
+        ${c.passportPhoto ? `<img src="${c.passportPhoto}" alt="">` : ""}
+        <div>
+          <div class="cr-name">${escapeHtml(c.fullName)} <span class="cr-online${online ? " online" : ""}"><span class="dot"></span>${online ? "Online" : "Offline"}</span></div>
+          <div class="cr-meta">NIN •••••${escapeHtml(String(c.nin).slice(-3))} · ${c.phone ? `<a href="tel:${escapeHtml(c.phone)}" style="color:inherit;">${escapeHtml(c.phone)}</a>` : "no phone"} · joined ${new Date(c.createdAt).toLocaleDateString()}</div>
+        </div>`;
+      list.appendChild(row);
+    });
+  }
+  $("stat-citizens-box").addEventListener("click", () => {
+    renderCitizensList();
+    $("citizens-modal").classList.add("show");
+  });
+  $("citizens-modal-close").addEventListener("click", () => $("citizens-modal").classList.remove("show"));
+  $("citizens-modal").addEventListener("click", (e) => {
+    if (e.target.id === "citizens-modal") $("citizens-modal").classList.remove("show");
+  });
+
+  // ---------------- Add case manually ----------------
+  WolfDB.CRIME_TYPES.forEach(ct => {
+    const opt = document.createElement("option");
+    opt.value = ct.id; opt.textContent = ct.label;
+    $("ac-crime").appendChild(opt);
+  });
+  $("ac-crime").addEventListener("change", () => {
+    const ct = WolfDB.CRIME_TYPES.find(c => c.id === $("ac-crime").value);
+    if (ct) $("ac-urgency").value = ct.urgency;
+  });
+  $("ac-crime").dispatchEvent(new Event("change"));
+
+  function openAddCaseModal(){
+    const sel = $("ac-citizen");
+    sel.innerHTML = '<option value="">— Walk-in / phone report —</option>';
+    WolfDB.allCitizens().forEach(c => {
+      const opt = document.createElement("option");
+      opt.value = c.id; opt.textContent = c.fullName;
+      sel.appendChild(opt);
+    });
+    $("ac-reporter").value = "";
+    $("ac-desc").value = "";
+    $("ac-lat").value = "";
+    $("ac-lng").value = "";
+    $("ac-error").textContent = "";
+    $("add-case-modal").classList.add("show");
+  }
+  $("btn-add-case").addEventListener("click", openAddCaseModal);
+  $("add-case-close").addEventListener("click", () => $("add-case-modal").classList.remove("show"));
+  $("add-case-modal").addEventListener("click", (e) => {
+    if (e.target.id === "add-case-modal") $("add-case-modal").classList.remove("show");
+  });
+  $("btn-ac-submit").addEventListener("click", () => {
+    const citizenId = $("ac-citizen").value || null;
+    const reporterName = $("ac-reporter").value.trim();
+    const description = $("ac-desc").value.trim();
+    const crimeType = $("ac-crime").value;
+    const urgency = $("ac-urgency").value;
+    const latStr = $("ac-lat").value.trim();
+    const lngStr = $("ac-lng").value.trim();
+    const err = $("ac-error");
+    err.textContent = "";
+
+    if (!description) { err.textContent = "Please add a short description."; return; }
+    if (!citizenId && !reporterName) { err.textContent = "Add a reporter name, or select a registered citizen."; return; }
+    let lat = null, lng = null;
+    if (latStr || lngStr) {
+      lat = parseFloat(latStr); lng = parseFloat(lngStr);
+      if (Number.isNaN(lat) || Number.isNaN(lng)) { err.textContent = "Latitude/longitude must both be numbers, or both left blank."; return; }
+    }
+    try {
+      WolfDB.fileReport({ citizenId, reporterName, crimeType, description, lat, lng, urgency, source: "admin" });
+      $("add-case-modal").classList.remove("show");
+      renderAll();
+    } catch (e) {
+      err.textContent = e.message;
+    }
+  });
+
+  // ---------------- Stats ----------------
+  function renderStats(){
+    const citizens = WolfDB.allCitizens();
+    const reports = WolfDB.allReports();
+    const openCount = reports.filter(r => r.status !== "resolved").length;
+    const sosCount = WolfDB.activeSOS().length;
+    const onlineCount = citizens.filter(c => WolfDB.isOnline(c)).length;
+    $("stat-citizens").textContent = citizens.length;
+    $("stat-citizens-box").title = onlineCount + " online now — click to view all citizens";
+    $("stat-open").textContent = openCount;
+    $("stat-sos").textContent = sosCount;
+    document.querySelectorAll("#wolf-icon .wolf-eye").forEach(eye => {
+      eye.classList.toggle("alert", openCount > 0 || sosCount > 0);
+    });
+  }
+
+  function renderAll(){
+    renderMessages();
+    renderReportList();
+    renderSosList();
+    renderStats();
+    renderMap();
+    if ($("citizens-modal").classList.contains("show")) renderCitizensList();
+  }
+
+  WolfDB.onUpdate(() => { if ($("shell").classList.contains("active")) renderAll(); });
+  setInterval(() => { if ($("shell").classList.contains("active")) renderAll(); }, 5000);
+</script>
+</body>
+</html>

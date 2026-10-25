@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WolfWatch — Citizen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0A0A0C;
+    --panel:#16161B;
+    --panel-raised:#1E1E25;
+    --border:#2B2B33;
+    --text:#EDEDE6;
+    --text-dim:#8E8E99;
+    --accent:#4A6FA5;
+    --accent-bright:#6E92C7;
+    --accent-soft:rgba(74,111,165,0.16);
+    --danger:#FF2E2E;
+    --danger-bright:#FF5A5A;
+    --danger-soft:rgba(255,46,46,0.12);
+    --amber:#FFB703;
+    --amber-soft:rgba(255,183,3,0.12);
+    --green:#3FBE6B;
+    --radius-sm:6px;
+    --radius-md:12px;
+    --radius-lg:20px;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background: var(--bg);
+    color:var(--text);
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:28px 14px;
+    -webkit-font-smoothing:antialiased;
+    position:relative;
+    overflow-x:hidden;
+  }
+  /* On wider (laptop/desktop) viewports the phone card no longer fills the
+     screen on its own, so give the extra space a subtle presence instead of
+     leaving it flat and empty: a soft radial glow plus a faint oversized wolf
+     silhouette behind the card. Purely decorative — never shown on phones. */
+  body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    z-index:0;
+    background:
+      radial-gradient(circle at 50% 42%, rgba(74,111,165,0.10), transparent 55%),
+      radial-gradient(circle at 50% 50%, var(--bg) 0%, #050506 100%);
+    display:none;
+  }
+  body::after{
+    content:"";
+    position:fixed;
+    top:50%; left:50%;
+    width:min(70vw, 900px);
+    height:min(70vw, 900px);
+    transform:translate(-50%,-50%);
+    background:var(--text);
+    opacity:0.035;
+    clip-path:polygon(20% 8%, 38% 32%, 50% 22%, 62% 32%, 80% 8%, 88% 50%, 50% 96%, 12% 50%);
+    z-index:0;
+    display:none;
+    pointer-events:none;
+  }
+  @media (min-width:760px){
+    body::before, body::after{ display:block; }
+  }
+  ::placeholder{ color:#5B5B66; }
+  h1,h2,h3{
+    font-family:"Oswald","Inter",sans-serif;
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    margin:0;
+  }
+  .phone{
+    position:relative;
+    z-index:1;
+    width:100%;
+    max-width:clamp(380px, 46vw, 560px);
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:18px;
+    overflow:hidden;
+    box-shadow:0 30px 60px -20px rgba(0,0,0,0.7);
+    min-height:min(82vh, 820px);
+    display:flex;
+    flex-direction:column;
+  }
+  @media (min-width:760px){
+    .phone{ box-shadow:0 40px 90px -20px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.02); }
+  }
+  .topbar{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:16px 18px;
+    border-bottom:1px solid var(--border);
+    background:var(--panel);
+  }
+  .wolf-mark{ display:flex; align-items:center; gap:10px; }
+  .wolf-mark svg{ width:28px; height:28px; flex:none; }
+  .wolf-eye{ fill:var(--text-dim); transition:fill .4s ease; }
+  .wolf-eye.alert{ fill:var(--danger); animation:eyeglow 1.4s ease-in-out infinite; }
+  @keyframes eyeglow{
+    0%,100%{ fill:var(--danger); filter:drop-shadow(0 0 1px var(--danger)); }
+    50%{ fill:var(--danger-bright); filter:drop-shadow(0 0 6px var(--danger)); }
+  }
+  .brand{
+    font-family:"Oswald",sans-serif;
+    font-size:16px;
+    font-weight:600;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+  }
+  .brand small{
+    display:block;
+    font-family:"Inter",sans-serif;
+    font-size:11px;
+    color:var(--text-dim);
+    font-weight:400;
+    text-transform:none;
+    letter-spacing:0;
+    margin-top:2px;
+  }
+  .screen{ padding:clamp(22px,3vw,34px) clamp(18px,3vw,32px) clamp(26px,3vw,36px); flex:1; display:none; overflow-y:auto; }
+  .screen.active{ display:block; }
+
+  /* ---------- form controls ---------- */
+  label{
+    display:block;
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    color:var(--text-dim);
+    margin:18px 0 8px;
+  }
+  input[type=text], input[type=password], input[type=tel], textarea{
+    width:100%;
+    background:var(--panel-raised);
+    border:1px solid var(--border);
+    border-radius:var(--radius-sm);
+    padding:12px 13px;
+    color:var(--text);
+    font-size:14.5px;
+    font-family:"Inter",sans-serif;
+  }
+  input:focus, textarea:focus, button:focus-visible{
+    outline:2px solid var(--accent-bright);
+    outline-offset:1px;
+    border-color:var(--accent-bright);
+  }
+  textarea{ resize:vertical; min-height:80px; }
+
+  .phone-field{ display:flex; align-items:stretch; }
+  .phone-field .phone-prefix{
+    display:flex; align-items:center; padding:0 10px;
+    background:var(--panel-raised); border:1px solid var(--border); border-right:none;
+    border-radius:var(--radius-sm) 0 0 var(--radius-sm); color:var(--text-dim);
+    font-size:14.5px; font-family:"JetBrains Mono",monospace;
+  }
+  .phone-field input{ border-radius:0 var(--radius-sm) var(--radius-sm) 0; }
+
+  .upload-box{
+    display:block;
+    border:1px dashed var(--border);
+    border-radius:var(--radius-sm);
+    padding:16px;
+    text-align:center;
+    cursor:pointer;
+    background:var(--panel-raised);
+    color:var(--text-dim);
+    font-size:13px;
+    transition:border-color .15s ease, color .15s ease;
+  }
+  .upload-box:hover{ border-color:var(--accent-bright); color:var(--text); }
+  .upload-box input{ display:none; }
+  .upload-box .hint{ font-size:12px; color:var(--text-dim); margin-top:4px; }
+  .upload-preview{
+    margin-top:10px;
+    width:100%;
+    max-height:120px;
+    object-fit:cover;
+    border-radius:var(--radius-sm);
+    display:none;
+  }
+
+  button.primary{
+    width:100%;
+    margin-top:22px;
+    padding:14px;
+    border:none;
+    border-radius:var(--radius-sm);
+    background:var(--text);
+    color:var(--bg);
+    font-family:"Oswald",sans-serif;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    font-weight:600;
+    font-size:14.5px;
+    cursor:pointer;
+  }
+  button.primary:hover{ background:#fff; }
+  .link-btn{
+    background:none;border:none;color:var(--accent-bright);
+    font-size:13px;cursor:pointer;margin-top:14px;display:block;width:100%;
+    text-align:center;font-family:"Inter",sans-serif;text-decoration:underline;
+  }
+  .error-text{ color:var(--danger-bright); font-size:12.5px; margin-top:10px; min-height:16px; line-height:1.5; }
+
+  /* ---------- home screen ---------- */
+  .id-card{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    background:var(--panel-raised);
+    border:1px solid var(--border);
+    border-radius:var(--radius-md);
+    padding:14px;
+  }
+  .id-card img{
+    width:54px;height:54px;border-radius:8px;object-fit:cover;
+    border:1px solid var(--border);
+    background:var(--bg);
+  }
+  .id-card .name{ font-family:"Oswald",sans-serif; font-size:16px; text-transform:uppercase; letter-spacing:0.03em; }
+  .id-card .sub{ font-size:11.5px; color:var(--text-dim); margin-top:3px; font-family:"JetBrains Mono",monospace; }
+
+  .section-title{
+    font-family:"Inter",sans-serif;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.12em;
+    color:var(--text-dim);
+    margin:24px 0 10px;
+  }
+
+  .crime-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+  @media (min-width:760px){
+    .crime-grid{ grid-template-columns:1fr 1fr 1fr; }
+  }
+  .crime-btn{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    background:var(--panel-raised);
+    border:1px solid var(--border);
+    border-radius:var(--radius-sm);
+    color:var(--text);
+    padding:12px 11px;
+    font-size:13px;
+    font-weight:500;
+    text-align:left;
+    cursor:pointer;
+    font-family:"Inter",sans-serif;
+    transition:border-color .15s ease;
+  }
+  .crime-btn:hover{ border-color:var(--accent-bright); }
+  .crime-btn .dot{ width:9px; height:9px; border-radius:50%; flex:none; }
+
+  /* ---------- SOS ---------- */
+  .sos-wrap{ margin:26px 0 6px; }
+  .sos-btn{
+    width:100%;
+    padding:clamp(20px,2.8vw,34px);
+    border-radius:14px;
+    border:none;
+    background:var(--danger);
+    color:#fff;
+    font-family:"Oswald",sans-serif;
+    font-weight:700;
+    font-size:clamp(20px,2.4vw,30px);
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    cursor:pointer;
+    position:relative;
+    box-shadow:0 0 0 0 rgba(255,46,46,0.5);
+    animation:pulse 2.2s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%{ box-shadow:0 0 0 0 rgba(255,46,46,0.5); }
+    70%{ box-shadow:0 0 0 22px rgba(255,46,46,0); }
+    100%{ box-shadow:0 0 0 0 rgba(255,46,46,0); }
+  }
+  .sos-caption{ text-align:center; font-size:12px; color:var(--text-dim); margin-top:10px; line-height:1.5; }
+
+  /* ---------- alert ticker + admin feed ---------- */
+  .urgent-banner{
+    display:none;
+    align-items:center;
+    gap:10px;
+    background:var(--amber-soft);
+    border:1px solid var(--amber);
+    color:var(--amber);
+    border-radius:var(--radius-sm);
+    padding:10px 12px;
+    font-size:12.5px;
+    margin-bottom:14px;
+  }
+  .urgent-banner.show{ display:flex; }
+  .urgent-dot{
+    width:8px;height:8px;border-radius:50%;background:var(--amber);flex:none;
+    animation:blink 1.2s infinite;
+  }
+  @keyframes blink{ 50%{ opacity:.25; } }
+
+  .feed-item{
+    background:var(--panel-raised);
+    border:1px solid var(--border);
+    border-left:3px solid var(--accent);
+    border-radius:var(--radius-sm);
+    padding:10px 12px;
+    font-size:13px;
+    margin-bottom:8px;
+  }
+  .feed-item.urgent{ border-left-color:var(--amber); }
+  .feed-item .meta{ font-size:11px; color:var(--text-dim); margin-top:5px; font-family:"JetBrains Mono",monospace; }
+  .empty-note{ color:var(--text-dim); font-size:12.5px; line-height:1.6; }
+
+  .status-pill{
+    display:inline-block;
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    padding:2px 8px;
+    border-radius:20px;
+    margin-top:6px;
+    color:#fff;
+  }
+
+  .toast{
+    position:fixed; left:50%; bottom:24px; transform:translateX(-50%);
+    background:var(--panel-raised); border:1px solid var(--border);
+    color:var(--text); padding:12px 18px; border-radius:var(--radius-sm);
+    font-size:13px; box-shadow:0 10px 30px rgba(0,0,0,.5);
+    display:none; z-index:50; max-width:340px; text-align:center;
+  }
+  .topnav{
+    display:flex; border-top:1px solid var(--border);
+    background:var(--panel);
+  }
+  .topnav button{
+    flex:1; background:none; border:none; color:var(--text-dim);
+    padding:12px; font-size:11px; text-transform:uppercase; letter-spacing:0.06em;
+    cursor:pointer; font-family:"Inter",sans-serif;
+  }
+  .topnav button.active{ color:var(--accent-bright); }
+  #btn-logout{ color:var(--danger-bright); }
+  #btn-logout:hover{ color:var(--danger); }
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="topbar">
+    <div class="wolf-mark">
+      <svg id="wolf-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="20,8 38,32 50,22 62,32 80,8 88,50 50,96 12,50" fill="var(--text)" />
+        <circle class="wolf-eye" cx="38" cy="47" r="4.2" />
+        <circle class="wolf-eye" cx="62" cy="47" r="4.2" />
+      </svg>
+      <div class="brand">WolfWatch <small>Citizen safety network</small></div>
+    </div>
+  </div>
+
+  <!-- ===================== SIGN UP ===================== -->
+  <div class="screen active" id="screen-signup">
+    <h2>Create your account</h2>
+    <p style="color:var(--text-dim); font-size:12.5px; margin-top:6px;">Your NIN verifies your identity so reports carry weight with responders.</p>
+
+    <label for="su-first">First name</label>
+    <input type="text" id="su-first" placeholder="As it appears on your NIN" />
+
+    <label for="su-middle">Middle name <span style="text-transform:none; letter-spacing:0; color:var(--text-dim);">(optional)</span></label>
+    <input type="text" id="su-middle" placeholder="" />
+
+    <label for="su-last">Last name</label>
+    <input type="text" id="su-last" placeholder="As it appears on your NIN" />
+
+    <label for="su-nin">Nigerian National Identification Number (NIN)</label>
+    <input type="text" id="su-nin" placeholder="e.g. 12345678901" maxlength="11" />
+
+    <label for="su-phone">Phone number</label>
+    <div class="phone-field">
+      <span class="phone-prefix">+234</span>
+      <input type="tel" id="su-phone" placeholder="80..." />
+    </div>
+
+    <label>Upload NIN card / slip</label>
+    <label class="upload-box" id="box-nin" for="file-nin">
+      <input type="file" id="file-nin" accept="image/*" />
+      <div>Tap to upload a photo of your NIN</div>
+      <div class="hint">JPG or PNG</div>
+      <img class="upload-preview" id="preview-nin" />
+    </label>
+
+    <label>Upload passport photograph</label>
+    <label class="upload-box" id="box-passport" for="file-passport">
+      <input type="file" id="file-passport" accept="image/*" />
+      <div>Tap to upload a passport photo</div>
+      <div class="hint">Clear, front-facing photo</div>
+      <img class="upload-preview" id="preview-passport" />
+    </label>
+
+    <label for="su-pass">Create a password</label>
+    <input type="password" id="su-pass" placeholder="Minimum 4 characters" />
+
+    <div class="error-text" id="signup-error"></div>
+    <button class="primary" id="btn-signup">Create account</button>
+    <button class="link-btn" id="go-login">Already have an account? Log in</button>
+  </div>
+
+  <!-- ===================== LOGIN ===================== -->
+  <div class="screen" id="screen-login">
+    <h2>Welcome back</h2>
+    <label for="li-nin">NIN</label>
+    <input type="text" id="li-nin" placeholder="Your NIN" maxlength="11" />
+    <label for="li-pass">Password</label>
+    <input type="password" id="li-pass" placeholder="Your password" />
+    <div class="error-text" id="login-error"></div>
+    <button class="primary" id="btn-login">Log in</button>
+    <button class="link-btn" id="go-signup">New here? Create an account</button>
+  </div>
+
+  <!-- ===================== HOME ===================== -->
+  <div class="screen" id="screen-home">
+    <div class="urgent-banner" id="urgent-banner">
+      <span class="urgent-dot"></span>
+      <span id="urgent-text"></span>
+    </div>
+
+    <div class="id-card">
+      <img id="home-passport" src="" alt="Passport photo" />
+      <div>
+        <div class="name" id="home-name">—</div>
+        <div class="sub" id="home-nin">NIN •••</div>
+      </div>
+    </div>
+
+    <div class="section-title">Report a crime</div>
+    <div class="crime-grid" id="crime-grid"></div>
+
+    <div class="sos-wrap">
+      <button class="sos-btn" id="btn-sos">SOS</button>
+    </div>
+    <div class="sos-caption">Press and hold nothing — one tap alerts WolfWatch responders with your live location</div>
+
+    <div class="section-title">From WolfWatch admin</div>
+    <div id="admin-feed"></div>
+
+    <div class="section-title">Your reports</div>
+    <div id="my-reports"></div>
+  </div>
+
+  <!-- ===================== REPORT FORM ===================== -->
+  <div class="screen" id="screen-report">
+    <h2 id="report-title">Report an incident</h2>
+    <label for="rep-desc">What happened?</label>
+    <textarea id="rep-desc" placeholder="Briefly describe the incident, number of people involved, any danger present..."></textarea>
+    <div class="error-text" id="report-location-note" style="color:var(--text-dim);"></div>
+    <div class="error-text" id="report-error"></div>
+    <button class="primary" id="btn-submit-report">Submit report</button>
+    <button class="link-btn" id="btn-cancel-report">Cancel</button>
+  </div>
+
+  <div class="topnav" id="topnav" style="display:none;">
+    <button class="active" data-screen="screen-home">Home</button>
+    <button id="btn-logout">Log out</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/**
+ * WolfWatch shared data layer.
+ * ----------------------------
+ * This file is loaded by BOTH citizen.html and admin.html.
+ * For the two apps to talk to each other in a browser (no server),
+ * they must be served from the same origin — e.g. run:
+ *     python3 -m http.server 8000
+ * inside this folder, then open:
+ *     http://localhost:8000/citizen.html
+ *     http://localhost:8000/admin.html
+ * Opening the files directly as file:// in two tabs will NOT share
+ * data in most modern browsers, because file:// pages are treated
+ * as separate origins for storage.
+ *
+ * In production this whole file is replaced by real HTTP calls to
+ * the REST API + SQL database described in schema.sql. Every function
+ * below is written to map 1:1 onto a future endpoint, so swapping
+ * localStorage for `fetch()` later is mechanical.
+ */
+
+const WOLF_DB_KEY = "wolfwatch_db_v1";
+
+const CRIME_TYPES = [
+  { id: "armed-robbery", label: "Armed Robbery", color: "#8B0000", urgency: "critical" },
+  { id: "robbery",       label: "Robbery / Mugging", color: "#E63946", urgency: "high" },
+  { id: "assault",       label: "Assault", color: "#F4631E", urgency: "high" },
+  { id: "kidnapping",    label: "Kidnapping", color: "#C9184A", urgency: "critical" },
+  { id: "domestic",      label: "Domestic Violence", color: "#7B2CBF", urgency: "high" },
+  { id: "harassment",    label: "Harassment / Stalking", color: "#FF6B9D", urgency: "medium" },
+  { id: "theft",         label: "Theft / Burglary", color: "#FFB703", urgency: "medium" },
+  { id: "fraud",         label: "Fraud / Scam", color: "#5C6BC0", urgency: "low" },
+  { id: "fire",          label: "Fire Emergency", color: "#FF4500", urgency: "critical" },
+  { id: "medical",       label: "Medical Emergency", color: "#2A9D8F", urgency: "critical" },
+  { id: "accident",      label: "Road Accident", color: "#457B9D", urgency: "high" },
+  { id: "vandalism",     label: "Vandalism", color: "#8D6E63", urgency: "low" },
+  { id: "missing",       label: "Missing Person", color: "#FFD60A", urgency: "high" },
+  { id: "other",         label: "Other Emergency", color: "#6C757D", urgency: "medium" },
+];
+
+// Urgency levels used to triage and sort cases on the admin side.
+const URGENCY_LEVELS = {
+  critical: { label: "Critical", rank: 4, color: "#FF2E2E" },
+  high:     { label: "High",     rank: 3, color: "#F4631E" },
+  medium:   { label: "Medium",   rank: 2, color: "#FFB703" },
+  low:      { label: "Low",      rank: 1, color: "#6E92C7" },
+};
+
+// A citizen counts as "online" if their app has pinged within this window.
+const ONLINE_WINDOW_MS = 45000;
+
+// Status → colour code shown consistently across both apps (case workflow stage,
+// distinct from the crime-type colour used for the dot on each chip/marker).
+const STATUS_COLORS = {
+  new: "#FF2E2E",        // just reported, unassigned — ember
+  active: "#F4631E",     // a responder is en route — hot orange
+  monitoring: "#FFB703", // under watch / low severity — amber
+  resolved: "#3FBE6B",   // closed — green
+  sos: "#FF1E1E",        // live SOS — bright red, pulses on map
+};
+
+function _read() {
+  const raw = localStorage.getItem(WOLF_DB_KEY);
+  if (!raw) {
+    const seed = { citizens: [], reports: [], sosAlerts: [], messages: [] };
+    localStorage.setItem(WOLF_DB_KEY, JSON.stringify(seed));
+    return seed;
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    const seed = { citizens: [], reports: [], sosAlerts: [], messages: [] };
+    localStorage.setItem(WOLF_DB_KEY, JSON.stringify(seed));
+    return seed;
+  }
+}
+
+function _write(db) {
+  try {
+    localStorage.setItem(WOLF_DB_KEY, JSON.stringify(db));
+  } catch (e) {
+    throw new Error("Browser storage is full — try smaller photos or clear old data.");
+  }
+  // Let any open tab (e.g. the admin dashboard) know data changed.
+  window.dispatchEvent(new CustomEvent("wolfwatch:update"));
+}
+
+function _id(prefix) {
+  return prefix + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+const WolfDB = {
+  CRIME_TYPES,
+  STATUS_COLORS,
+  URGENCY_LEVELS,
+
+  // ---- Citizens -----------------------------------------------------
+  signUp({ firstName, middleName, lastName, nin, phone, password, ninPhotoDataUrl, passportPhotoDataUrl }) {
+    const db = _read();
+    if (db.citizens.some((c) => c.nin === nin)) {
+      throw new Error("An account with this NIN already exists.");
+    }
+    const fullName = [firstName, middleName, lastName].filter(Boolean).join(" ");
+    const citizen = {
+      id: _id("cit"),
+      firstName,
+      middleName: middleName || "",
+      lastName,
+      fullName,
+      nin,
+      phone,
+      password, // demo only — a real backend must hash this (see schema.sql)
+      ninPhoto: ninPhotoDataUrl,
+      passportPhoto: passportPhotoDataUrl,
+      createdAt: new Date().toISOString(),
+      lastKnownLocation: null,
+    };
+    db.citizens.push(citizen);
+    _write(db);
+    return citizen;
+  },
+
+  login(nin, password) {
+    const db = _read();
+    const citizen = db.citizens.find((c) => c.nin === nin && c.password === password);
+    if (!citizen) throw new Error("NIN or password is incorrect.");
+    return citizen;
+  },
+
+  getCitizen(id) {
+    return _read().citizens.find((c) => c.id === id) || null;
+  },
+
+  allCitizens() {
+    return _read().citizens.slice();
+  },
+
+  isOnline(citizen) {
+    if (!citizen || !citizen.online || !citizen.lastSeenAt) return false;
+    return Date.now() - Date.parse(citizen.lastSeenAt) < ONLINE_WINDOW_MS;
+  },
+
+  // Called every few seconds by the citizen app while logged in.
+  heartbeat(citizenId) {
+    const db = _read();
+    const c = db.citizens.find((x) => x.id === citizenId);
+    if (c) {
+      c.online = true;
+      c.lastSeenAt = new Date().toISOString();
+      _write(db);
+    }
+  },
+
+  goOffline(citizenId) {
+    const db = _read();
+    const c = db.citizens.find((x) => x.id === citizenId);
+    if (c) {
+      c.online = false;
+      c.lastSeenAt = new Date().toISOString();
+      _write(db);
+    }
+  },
+
+  updateLocation(citizenId, lat, lng) {
+    const db = _read();
+    const c = db.citizens.find((x) => x.id === citizenId);
+    if (c) {
+      c.lastKnownLocation = { lat, lng, at: new Date().toISOString() };
+      _write(db);
+    }
+  },
+
+  // ---- Crime reports --------------------------------------------------
+  fileReport({ citizenId, crimeType, description, lat, lng, urgency, status, source, reporterName }) {
+    const db = _read();
+    const ct = CRIME_TYPES.find((c) => c.id === crimeType);
+    const report = {
+      id: _id("rpt"),
+      citizenId: citizenId || null,
+      reporterName: reporterName || "",
+      source: source || "citizen",
+      crimeType,
+      description,
+      lat: lat == null ? null : lat,
+      lng: lng == null ? null : lng,
+      urgency: urgency || (ct && ct.urgency) || "medium",
+      status: status || "new",
+      createdAt: new Date().toISOString(),
+    };
+    db.reports.push(report);
+    _write(db);
+    return report;
+  },
+
+  setReportStatus(reportId, status) {
+    const db = _read();
+    const r = db.reports.find((x) => x.id === reportId);
+    if (r) {
+      r.status = status;
+      _write(db);
+    }
+  },
+
+  setReportUrgency(reportId, urgency) {
+    const db = _read();
+    const r = db.reports.find((x) => x.id === reportId);
+    if (r) {
+      r.urgency = urgency;
+      _write(db);
+    }
+  },
+
+  urgencyOf(report) {
+    if (report.urgency && URGENCY_LEVELS[report.urgency]) return report.urgency;
+    const ct = CRIME_TYPES.find((c) => c.id === report.crimeType);
+    return (ct && ct.urgency) || "medium";
+  },
+
+  deleteReport(reportId) {
+    const db = _read();
+    db.reports = db.reports.filter((x) => x.id !== reportId);
+    _write(db);
+  },
+
+  allReports() {
+    return _read().reports.slice().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  },
+
+  reportsFor(citizenId) {
+    return this.allReports().filter((r) => r.citizenId === citizenId);
+  },
+
+  // ---- SOS ------------------------------------------------------------
+  raiseSOS({ citizenId, lat, lng }) {
+    const db = _read();
+    const alert = {
+      id: _id("sos"),
+      citizenId,
+      lat,
+      lng,
+      status: "sos",
+      createdAt: new Date().toISOString(),
+      resolved: false,
+    };
+    db.sosAlerts.push(alert);
+    _write(db);
+    return alert;
+  },
+
+  resolveSOS(alertId) {
+    const db = _read();
+    const a = db.sosAlerts.find((x) => x.id === alertId);
+    if (a) {
+      a.resolved = true;
+      _write(db);
+    }
+  },
+
+  activeSOS() {
+    return _read().sosAlerts.filter((a) => !a.resolved);
+  },
+
+  // ---- Admin broadcast messages ----------------------------------------
+  sendMessage({ text, urgent }) {
+    const db = _read();
+    const msg = {
+      id: _id("msg"),
+      text,
+      urgent: !!urgent,
+      createdAt: new Date().toISOString(),
+    };
+    db.messages.push(msg);
+    _write(db);
+    return msg;
+  },
+
+  allMessages() {
+    return _read().messages.slice().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  },
+
+  // ---- Admin auth (hardcoded per spec) ---------------------------------
+  adminLogin(username, password) {
+    return username === "lino" && password === "9876";
+  },
+
+  onUpdate(cb) {
+    window.addEventListener("wolfwatch:update", cb);
+    window.addEventListener("storage", cb); // fires across tabs/windows
+  },
+};
+
+</script>
+<script>
+  let currentCitizen = null;
+  let pendingCrimeType = null;
+
+  const $ = (id) => document.getElementById(id);
+
+  function showScreen(id){
+    document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+    $(id).classList.add("active");
+    $("topnav").style.display = (id === "screen-home") ? "flex" : "none";
+  }
+
+  function toast(msg){
+    const t = $("toast");
+    t.textContent = msg;
+    t.style.display = "block";
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.style.display = "none", 2600);
+  }
+
+  function readFileAsDataUrl(file){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function wireUpload(boxId, fileId, previewId){
+    const input = $(fileId), preview = $(previewId);
+    let dataUrl = "";
+    input.addEventListener("change", async () => {
+      if (!input.files[0]) return;
+      dataUrl = await readFileAsDataUrl(input.files[0]);
+      preview.src = dataUrl;
+      preview.style.display = "block";
+    });
+    return () => dataUrl;
+  }
+  const getNinPhoto = wireUpload("box-nin", "file-nin", "preview-nin");
+  const getPassportPhoto = wireUpload("box-passport", "file-passport", "preview-passport");
+
+  // ---------------- Sign up ----------------
+  function attemptSignup(){
+    const firstName = $("su-first").value.trim();
+    const middleName = $("su-middle").value.trim();
+    const lastName = $("su-last").value.trim();
+    const nin = $("su-nin").value.trim();
+    const phoneLocal = $("su-phone").value.trim().replace(/^0+/, "");
+    const phone = phoneLocal ? "+234" + phoneLocal : "";
+    const password = $("su-pass").value;
+    const ninPhoto = getNinPhoto();
+    const passportPhoto = getPassportPhoto();
+    const err = $("signup-error");
+    err.textContent = "";
+
+    if (!firstName || !lastName || !nin || !password) { err.textContent = "First name, last name, NIN and password are required."; return; }
+    if (nin.length < 6) { err.textContent = "Enter a valid NIN."; return; }
+    if (!ninPhoto || !passportPhoto) { err.textContent = "Please upload both your NIN and a passport photo."; return; }
+
+    try {
+      const citizen = WolfDB.signUp({ firstName, middleName, lastName, nin, phone, password, ninPhotoDataUrl: ninPhoto, passportPhotoDataUrl: passportPhoto });
+      currentCitizen = citizen;
+      enterHome();
+      toast("Account created. Welcome to WolfWatch.");
+    } catch (e) {
+      err.textContent = e.message;
+    }
+  }
+  $("btn-signup").addEventListener("click", attemptSignup);
+  ["su-first", "su-middle", "su-last", "su-nin", "su-phone", "su-pass"].forEach(id => {
+    $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") attemptSignup(); });
+  });
+
+  $("go-login").addEventListener("click", () => showScreen("screen-login"));
+  $("go-signup").addEventListener("click", () => showScreen("screen-signup"));
+
+  // ---------------- Login ----------------
+  function attemptLogin(){
+    const nin = $("li-nin").value.trim();
+    const password = $("li-pass").value;
+    const err = $("login-error");
+    err.textContent = "";
+    try {
+      currentCitizen = WolfDB.login(nin, password);
+      enterHome();
+    } catch (e) {
+      err.textContent = e.message;
+    }
+  }
+  $("btn-login").addEventListener("click", attemptLogin);
+  ["li-nin", "li-pass"].forEach(id => {
+    $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") attemptLogin(); });
+  });
+
+  $("btn-logout").addEventListener("click", () => {
+    if (currentCitizen) WolfDB.goOffline(currentCitizen.id);
+    currentCitizen = null;
+    showScreen("screen-login");
+  });
+  window.addEventListener("beforeunload", () => {
+    if (currentCitizen) WolfDB.goOffline(currentCitizen.id);
+  });
+
+  // ---------------- Home ----------------
+  function enterHome(){
+    $("home-passport").src = currentCitizen.passportPhoto;
+    $("home-name").textContent = currentCitizen.fullName;
+    $("home-nin").textContent = "NIN •••••" + currentCitizen.nin.slice(-3);
+    trackLocation();
+    WolfDB.heartbeat(currentCitizen.id);
+    renderAdminFeed();
+    renderMyReports();
+    showScreen("screen-home");
+  }
+
+  function trackLocation(){
+    if (!navigator.geolocation || !currentCitizen) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => WolfDB.updateLocation(currentCitizen.id, pos.coords.latitude, pos.coords.longitude),
+      () => { /* location denied — SOS/report will fall back to a manual note */ }
+    );
+  }
+
+  // ---------------- Crime grid ----------------
+  const grid = $("crime-grid");
+  WolfDB.CRIME_TYPES.forEach(ct => {
+    const b = document.createElement("button");
+    b.className = "crime-btn";
+    b.innerHTML = `<span class="dot" style="background:${ct.color}"></span><span>${ct.label}</span>`;
+    b.addEventListener("click", () => openReportForm(ct));
+    grid.appendChild(b);
+  });
+
+  function openReportForm(ct){
+    pendingCrimeType = ct;
+    $("report-title").textContent = "Report: " + ct.label;
+    $("rep-desc").value = "";
+    $("report-error").textContent = "";
+    $("report-location-note").textContent = navigator.geolocation
+      ? "Your current location will be attached automatically."
+      : "Location services unavailable on this device — the report will be filed without coordinates.";
+    showScreen("screen-report");
+  }
+  $("btn-cancel-report").addEventListener("click", () => showScreen("screen-home"));
+
+  $("btn-submit-report").addEventListener("click", () => {
+    const description = $("rep-desc").value.trim();
+    if (!description) { $("report-error").textContent = "Please describe what happened."; return; }
+
+    const file = (lat, lng) => {
+      WolfDB.fileReport({ citizenId: currentCitizen.id, crimeType: pendingCrimeType.id, description, lat, lng });
+      renderMyReports();
+      showScreen("screen-home");
+      toast("Report filed. Admin has been notified.");
+    };
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => file(pos.coords.latitude, pos.coords.longitude),
+        () => file(null, null)
+      );
+    } else {
+      file(null, null);
+    }
+  });
+
+  // ---------------- SOS ----------------
+  $("btn-sos").addEventListener("click", () => {
+    const send = (lat, lng) => {
+      WolfDB.raiseSOS({ citizenId: currentCitizen.id, lat, lng });
+      toast("SOS sent — your location has been shared with WolfWatch admin.");
+    };
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => send(pos.coords.latitude, pos.coords.longitude),
+        () => send(null, null)
+      );
+    } else {
+      send(null, null);
+    }
+  });
+
+  // ---------------- Admin feed + banner ----------------
+  function renderAdminFeed(){
+    const messages = WolfDB.allMessages();
+    const feed = $("admin-feed");
+    feed.innerHTML = "";
+    if (!messages.length) {
+      feed.innerHTML = '<div class="empty-note">No messages from admin yet.</div>';
+    } else {
+      messages.slice(0, 8).forEach(m => {
+        const div = document.createElement("div");
+        div.className = "feed-item" + (m.urgent ? " urgent" : "");
+        div.innerHTML = `<div>${escapeHtml(m.text)}</div><div class="meta">${m.urgent ? "URGENT · " : ""}${new Date(m.createdAt).toLocaleString()}</div>`;
+        feed.appendChild(div);
+      });
+    }
+    const latestUrgent = messages.find(m => m.urgent);
+    const banner = $("urgent-banner");
+    if (latestUrgent) {
+      banner.classList.add("show");
+      $("urgent-text").textContent = latestUrgent.text;
+    } else {
+      banner.classList.remove("show");
+    }
+    document.querySelectorAll("#wolf-icon .wolf-eye").forEach(eye => {
+      eye.classList.toggle("alert", !!latestUrgent);
+    });
+  }
+
+  function renderMyReports(){
+    const box = $("my-reports");
+    if (!currentCitizen) return;
+    const reports = WolfDB.reportsFor(currentCitizen.id);
+    box.innerHTML = "";
+    if (!reports.length) {
+      box.innerHTML = '<div class="empty-note">You haven\'t filed any reports.</div>';
+      return;
+    }
+    reports.forEach(r => {
+      const ct = WolfDB.CRIME_TYPES.find(c => c.id === r.crimeType);
+      const color = WolfDB.STATUS_COLORS[r.status] || "#888";
+      const div = document.createElement("div");
+      div.className = "feed-item";
+      div.style.borderLeftColor = color;
+      div.innerHTML = `<div style="display:flex; align-items:center; gap:7px;">
+          <span style="width:8px;height:8px;border-radius:50%;flex:none;background:${ct ? ct.color : "#888"}"></span>
+          <span>${ct ? ct.label : r.crimeType}</span>
+        </div>
+        <div class="meta">${new Date(r.createdAt).toLocaleString()}</div>
+        <span class="status-pill" style="background:${color}">${r.status.toUpperCase()}</span>`;
+      box.appendChild(div);
+    });
+  }
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+
+  // Live-refresh when admin sends a message or updates a report, and keep location fresh.
+  WolfDB.onUpdate(() => { if (currentCitizen) { renderAdminFeed(); renderMyReports(); } });
+  setInterval(() => { if (currentCitizen) { trackLocation(); WolfDB.heartbeat(currentCitizen.id); } }, 15000);
+</script>
+</body>
+</html>

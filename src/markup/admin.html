@@ -1,0 +1,158 @@
+
+
+<!-- ===================== LOGIN ===================== -->
+<div class="login-wrap" id="login-wrap">
+  <div class="login-card">
+    <div class="wolf-mark">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="20,8 38,32 50,22 62,32 80,8 88,50 50,96 12,50" fill="var(--text)" />
+        <circle class="wolf-eye" cx="38" cy="47" r="4.2" />
+        <circle class="wolf-eye" cx="62" cy="47" r="4.2" />
+      </svg>
+    </div>
+    <h2>WolfWatch Admin</h2>
+    <div class="sub">Command &amp; response console</div>
+    <label for="ad-user">Username</label>
+    <input type="text" id="ad-user" placeholder="Username" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
+    <label for="ad-pass">Password</label>
+    <input type="password" id="ad-pass" placeholder="Password" autocomplete="off" />
+    <button type="button" id="ad-pass-toggle" style="display:block; margin:6px 0 0 auto; background:none; border:none; color:var(--text-dim); font-size:11px; cursor:pointer; text-transform:uppercase; letter-spacing:0.05em;">Show</button>
+    <div class="login-error" id="ad-error"></div>
+    <button id="btn-admin-login">Log in</button>
+  </div>
+</div>
+
+<!-- ===================== DASHBOARD ===================== -->
+<div class="shell" id="shell">
+  <div class="sidebar">
+    <div class="side-header">
+      <div class="wolf-mark">
+        <svg id="wolf-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="20,8 38,32 50,22 62,32 80,8 88,50 50,96 12,50" fill="var(--text)" />
+          <circle class="wolf-eye" cx="38" cy="47" r="4.2" />
+          <circle class="wolf-eye" cx="62" cy="47" r="4.2" />
+        </svg>
+      </div>
+      <div class="brand">WolfWatch <small>Admin console</small></div>
+      <button id="btn-toggle-map-mobile" class="mobile-map-toggle">Map</button>
+    </div>
+
+    <div class="side-body">
+      <div class="stat-row">
+        <div class="stat-box stat-clickable" id="stat-citizens-box" title="View registered citizens">
+          <div class="num" id="stat-citizens">0</div><div class="label">Citizens</div>
+        </div>
+        <div class="stat-box"><div class="num" id="stat-open">0</div><div class="label">Open cases</div></div>
+        <div class="stat-box"><div class="num" id="stat-sos">0</div><div class="label">Live SOS</div></div>
+      </div>
+
+      <div class="side-section-title">Live SOS</div>
+      <div class="report-list" id="sos-list"></div>
+
+      <div class="side-section-title">Send urgent message</div>
+      <textarea id="msg-text" placeholder="e.g. Curfew in effect for Ward 4 from 8pm..."></textarea>
+      <label class="urgent-toggle"><input type="checkbox" id="msg-urgent" checked /> Mark as urgent (flags on citizen app)</label>
+      <button class="send-btn" id="btn-send-msg">Broadcast to all citizens</button>
+      <div class="msg-log" id="msg-log"></div>
+
+      <div class="side-section-title">Case colour code</div>
+      <div class="legend">
+        <div class="row"><span class="swatch" style="background:#FF2E2E;"></span> New — unassigned</div>
+        <div class="row"><span class="swatch" style="background:#F4631E;"></span> Active — responder en route</div>
+        <div class="row"><span class="swatch" style="background:#FFB703;"></span> Monitoring</div>
+        <div class="row"><span class="swatch" style="background:#3FBE6B;"></span> Resolved</div>
+        <div class="row"><span class="swatch" style="background:#FF1E1E;"></span> Live SOS (pulsing)</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="map-area" id="map-area">
+    <div class="map-topbar">Live map — active citizens &amp; reported cases</div>
+    <button class="logout-btn" id="btn-admin-logout">Log out</button>
+    <button class="map-close-mobile" id="btn-close-map-mobile">&times; Close map</button>
+    <div id="map"></div>
+  </div>
+
+  <div class="case-panel">
+    <div class="case-panel-head">
+      <h3 id="cases-list-title">Open cases</h3>
+      <button class="add-case-btn" id="btn-add-case" title="Add a case manually">+ Add case</button>
+    </div>
+    <div class="case-controls">
+      <label class="mini-toggle"><input type="checkbox" id="show-resolved" /> show resolved too</label>
+      <select id="sort-cases" class="status-select" title="Sort cases">
+        <option value="urgency">Sort: urgency</option>
+        <option value="newest">Sort: newest</option>
+      </select>
+    </div>
+    <div class="case-cards" id="report-list"></div>
+  </div>
+</div>
+
+<!-- ===================== CITIZENS MODAL ===================== -->
+<div class="modal-overlay" id="citizens-modal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3>Registered citizens</h3>
+      <button class="modal-close" id="citizens-modal-close">&times;</button>
+    </div>
+    <div class="citizens-list" id="citizens-list"></div>
+  </div>
+</div>
+
+<!-- ===================== ADD CASE MODAL ===================== -->
+<div class="modal-overlay" id="add-case-modal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3>Log a case manually</h3>
+      <button class="modal-close" id="add-case-close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label for="ac-citizen">Citizen (optional)</label>
+      <select id="ac-citizen"><option value="">— Walk-in / phone report —</option></select>
+
+      <label for="ac-reporter">Reporter name</label>
+      <input type="text" id="ac-reporter" placeholder="Name of person reporting (if not a registered citizen)" />
+
+      <label for="ac-crime">Crime type</label>
+      <select id="ac-crime"></select>
+
+      <label for="ac-urgency">Urgency</label>
+      <select id="ac-urgency">
+        <option value="critical">Critical</option>
+        <option value="high">High</option>
+        <option value="medium" selected>Medium</option>
+        <option value="low">Low</option>
+      </select>
+
+      <label for="ac-desc">Description</label>
+      <textarea id="ac-desc" placeholder="What happened..."></textarea>
+
+      <div style="display:flex; gap:10px;">
+        <div style="flex:1;">
+          <label for="ac-lat">Latitude (optional)</label>
+          <input type="text" id="ac-lat" placeholder="e.g. 6.5244" />
+        </div>
+        <div style="flex:1;">
+          <label for="ac-lng">Longitude (optional)</label>
+          <input type="text" id="ac-lng" placeholder="e.g. 3.3792" />
+        </div>
+      </div>
+      <div class="error-text" id="ac-error"></div>
+      <button class="send-btn" id="btn-ac-submit" style="margin-top:16px;">Log case</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SOS APPLICANT MODAL ===================== -->
+<div class="modal-overlay" id="sos-detail-modal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3>SOS applicant</h3>
+      <button class="modal-close" id="sos-detail-close">&times;</button>
+    </div>
+    <div class="modal-body" id="sos-detail-body"></div>
+  </div>
+</div>
+
