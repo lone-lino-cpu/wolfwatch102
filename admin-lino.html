@@ -37,33 +37,6 @@
     50%{ fill:var(--danger-bright); filter:drop-shadow(0 0 6px var(--danger)); }
   }
 
-  /* ---------------- Login ---------------- */
-  .login-wrap{
-    min-height:100vh; display:flex; align-items:center; justify-content:center;
-    background:radial-gradient(circle at 30% 20%, #16161B, #0A0A0C 70%);
-  }
-  .login-card{
-    width:340px; background:var(--panel); border:1px solid var(--border);
-    border-radius:14px; padding:32px 26px; box-shadow:0 30px 60px -20px rgba(0,0,0,.7);
-  }
-  .login-card .wolf-mark{ display:flex; justify-content:center; margin-bottom:16px; }
-  .login-card .wolf-mark svg{ width:42px; height:42px; }
-  .login-card h2{ text-align:center; }
-  .login-card .sub{ text-align:center; color:var(--text-dim); font-size:12px; margin-top:6px; text-transform:uppercase; letter-spacing:0.08em; }
-  .login-card label{ display:block; font-size:12px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-dim); margin:18px 0 8px; }
-  .login-card input{
-    width:100%; background:var(--panel-raised); border:1px solid var(--border);
-    border-radius:6px; padding:12px 13px; color:var(--text); font-size:14.5px; font-family:"Inter",sans-serif;
-  }
-  .login-card input:focus{ outline:2px solid var(--accent-bright); outline-offset:1px; border-color:var(--accent-bright); }
-  .login-card button{
-    width:100%; margin-top:22px; padding:13px; border:none; border-radius:6px;
-    background:var(--text); color:var(--bg); font-family:"Oswald",sans-serif; text-transform:uppercase;
-    letter-spacing:0.06em; font-weight:600; cursor:pointer; font-size:14.5px;
-  }
-  .login-card button:hover{ background:#fff; }
-  .login-error{ color:var(--danger-bright); font-size:12px; margin-top:10px; min-height:16px; text-align:center; line-height:1.6; }
-
   /* ---------------- Dashboard shell ---------------- */
   .shell{ display:none; height:100vh; }
   .shell.active{ display:grid; grid-template-columns:300px 1fr 400px; }
@@ -320,28 +293,6 @@
 </style>
 </head>
 <body>
-
-<!-- ===================== LOGIN ===================== -->
-<div class="login-wrap" id="login-wrap">
-  <div class="login-card">
-    <div class="wolf-mark">
-      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-        <polygon points="20,8 38,32 50,22 62,32 80,8 88,50 50,96 12,50" fill="var(--text)" />
-        <circle class="wolf-eye" cx="38" cy="47" r="4.2" />
-        <circle class="wolf-eye" cx="62" cy="47" r="4.2" />
-      </svg>
-    </div>
-    <h2>WolfWatch Admin</h2>
-    <div class="sub">Command &amp; response console</div>
-    <label for="ad-user">Username</label>
-    <input type="text" id="ad-user" placeholder="Username" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" />
-    <label for="ad-pass">Password</label>
-    <input type="password" id="ad-pass" placeholder="Password" autocomplete="off" />
-    <button type="button" id="ad-pass-toggle" style="display:block; margin:6px 0 0 auto; background:none; border:none; color:var(--text-dim); font-size:11px; cursor:pointer; text-transform:uppercase; letter-spacing:0.05em;">Show</button>
-    <div class="login-error" id="ad-error"></div>
-    <button id="btn-admin-login">Log in</button>
-  </div>
-</div>
 
 <!-- ===================== DASHBOARD ===================== -->
 <div class="shell" id="shell">
@@ -786,11 +737,6 @@ const WolfDB = {
     return _read().messages.slice().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   },
 
-  // ---- Admin auth (hardcoded per spec) ---------------------------------
-  adminLogin(username, password) {
-    return String(username).trim().toLowerCase() === "lino" && String(password).trim() === "9876";
-  },
-
   onUpdate(cb) {
     window.addEventListener("wolfwatch:update", cb);
     window.addEventListener("storage", cb); // fires across tabs/windows
@@ -801,47 +747,38 @@ const WolfDB = {
 <script>
   const $ = (id) => document.getElementById(id);
 
-  $("ad-pass-toggle").addEventListener("click", () => {
-    const field = $("ad-pass");
-    const btn = $("ad-pass-toggle");
-    if (field.type === "password") { field.type = "text"; btn.textContent = "Hide"; }
-    else { field.type = "password"; btn.textContent = "Show"; }
-  });
-
-  // ---------------- Login (hardcoded lino / 9876) ----------------
-  function attemptAdminLogin(){
-    const uRaw = $("ad-user").value;
-    const pRaw = $("ad-pass").value;
-    const u = uRaw.trim();
-    const p = pRaw;
-    if (WolfDB.adminLogin(u, p)) {
-      $("ad-error").textContent = "";
-      $("login-wrap").style.display = "none";
+  async function initializeAdmin() {
+    try {
+      const response = await fetch("/api/me");
+      if (!response.ok) throw new Error("Could not verify the admin session.");
+      const session = await response.json();
+      if (!session.loggedIn) {
+        window.location.replace("/login.html");
+        return;
+      }
       $("shell").classList.add("active");
       initMap();
       renderAll();
-    } else {
-      // Show exactly what was received (never the password itself) so a phone
-      // keyboard swap (autocapitalize, autocorrect, stray space) is visible
-      // instead of guessed at.
-      $("ad-error").innerHTML =
-        `Incorrect username or password.<br>` +
-        `Username received: "${escapeHtmlAd(uRaw)}" (length ${uRaw.length})<br>` +
-        `Password length received: ${pRaw.length}`;
+    } catch (error) {
+      console.error("Could not initialize the admin session:", error);
+      window.location.replace("/login.html");
     }
   }
-  function escapeHtmlAd(s){
-    return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-  }
-  $("btn-admin-login").addEventListener("click", attemptAdminLogin);
-  ["ad-user", "ad-pass"].forEach(id => {
-    $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") attemptAdminLogin(); });
+
+  $("btn-admin-logout").addEventListener("click", async () => {
+    const button = $("btn-admin-logout");
+    button.disabled = true;
+    try {
+      const response = await fetch("/api/logout", { method: "POST" });
+      if (!response.ok) throw new Error("The server could not end the session.");
+      window.location.replace("/login.html");
+    } catch (error) {
+      console.error("Could not log out:", error);
+      button.disabled = false;
+      window.alert("Unable to log out. Please try again.");
+    }
   });
-  $("btn-admin-logout").addEventListener("click", () => {
-    $("shell").classList.remove("active");
-    $("login-wrap").style.display = "flex";
-    $("ad-pass").value = "";
-  });
+  initializeAdmin();
   $("btn-toggle-map-mobile").addEventListener("click", () => {
     $("map-area").classList.add("show-mobile");
     if (map) setTimeout(() => map.invalidateSize(), 100);

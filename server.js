@@ -1,107 +1,157 @@
-import { createServer } from "node:http";
-import { access, readFile } from "node:fs/promises";
-import { extname, resolve, sep } from "node:path";
+import cookieParser from "cookie-parser";
+import express from "express";
+import { rateLimit } from "express-rate-limit";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 
-const projectDirectory = fileURLToPath(new URL(".", import.meta.url));
+const app = express();
+const projectDirectory = dirname(fileURLToPath(import.meta.url));
 const distDirectory = resolve(projectDirectory, "dist");
+const adminPagePath = resolve(distDirectory, "admin-lino.html");
 const indexPath = resolve(distDirectory, "index.html");
-const port = process.env.PORT ? Number(process.env.PORT) : 3000;
-const contentTypes = {
-  ".css": "text/css; charset=utf-8",
-  ".html": "text/html; charset=utf-8",
-  ".ico": "image/x-icon",
-  ".js": "text/javascript; charset=utf-8",
-  ".json": "application/json; charset=utf-8",
-  ".png": "image/png",
-  ".svg": "image/svg+xml",
-  ".txt": "text/plain; charset=utf-8",
-  ".webp": "image/webp",
-  ".woff": "font/woff",
-  ".woff2": "font/woff2",
-};
-
-process.on("unhandledRejection", (reason) => {
-  console.error("Unhandled promise rejection; shutting down:", reason);
-  process.exit(1);
-});
+const port = Number(process.env.PORT || 3000);
+const cookieName = "wolfwatch_admin";
+const sessionDurationMs = 8 * 60 * 60 * 1000;
+const sessionDurationSeconds = sessionDurationMs / 1000;
+const { ADMIN_USERNAME, ADMIN_PASSWORD_HASH, JWT_SECRET } = process.env;
 
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error(`Invalid PORT value: ${process.env.PORT}`);
 }
+if (!ADMIN_USERNAME || !ADMIN_PASSWORD_HASH || !JWT_SECRET) {
+  throw new Error(
+    "ADMIN_USERNAME, ADMIN_PASSWORD_HASH, and JWT_SECRET must be configured.",
+  );
+}
+if (!/^\$2[ab]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(ADMIN_PASSWORD_HASH)) {
+  throw new Error("ADMIN_PASSWORD_HASH must be a valid bcrypt hash.");
+}
+if (Buffer.byteLength(JWT_SECRET, "utf8") < 32) {
+  throw new Error("JWT_SECRET must be at least 32 bytes long.");
+}
 
-await access(indexPath);
+app.set("trust proxy", 1);
+app.use(express.json({ limit: "10kb" }));
+app.use(cookieParser());
 
-const server = createServer(async (request, response) => {
-  if (request.method !== "GET" && request.method !== "HEAD") {
-    response.writeHead(405, { Allow: "GET, HEAD" });
-    response.end("Method Not Allowed");
-    return;
-  }
+const loginRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many login attempts. Try again later." },
+});
 
-  let pathname;
+function isAuthenticated(request) {
+  const token = request.cookies[cookieName];
+  if (!token) return false;
+
   try {
-    pathname = decodeURIComponent(new URL(request.url, "http://localhost").pathname);
-  } catch (error) {
-    response.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
-    response.end("Bad Request");
+    const claims = jwt.verify(token, JWT_SECRET, { algorithms: ["HS256"] });
+    return typeof claims === "object" && claims.sub === ADMIN_USERNAME;
+  } catch {
+    return false;
+  }
+}
+
+function requireAdminPage(request, response, next) {
+  if (!isAuthenticated(request)) {
+    response.redirect(302, "/login.html");
     return;
   }
+  next();
+}
 
-  if (pathname === "/health") {
-    response.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
-    response.end(request.method === "HEAD" ? undefined : "OK");
+function requireAdminApi(request, response, next) {
+  if (!isAuthenticated(request)) {
+    response.status(401).json({ error: "Unauthorized" });
     return;
   }
+  next();
+}
 
+app.post("/api/login", loginRateLimit, async (request, response, next) => {
   try {
-    let filePath = resolve(distDirectory, `.${pathname}`);
-    if (filePath !== distDirectory && !filePath.startsWith(`${distDirectory}${sep}`)) {
-      response.writeHead(403);
-      response.end("Forbidden");
+    const { username, password } = request.body ?? {};
+    if (typeof username !== "string" || typeof password !== "string") {
+      response.status(400).json({ error: "Username and password are required." });
       return;
     }
 
-    let contents;
-    try {
-      contents = await readFile(filePath);
-    } catch (error) {
-      if (error.code !== "ENOENT" && error.code !== "EISDIR") {
-        throw error;
-      }
-
-      if (
-        pathname === "/" ||
-        pathname === "/admin" ||
-        pathname === "/citizen" ||
-        request.headers.accept?.includes("text/html")
-      ) {
-        filePath = indexPath;
-        contents = await readFile(indexPath);
-      } else {
-        response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
-        response.end("Not Found");
-        return;
-      }
+    const validPassword = await bcrypt.compare(password, ADMIN_PASSWORD_HASH);
+    if (username !== ADMIN_USERNAME || !validPassword) {
+      response.status(401).json({ error: "Invalid username or password." });
+      return;
     }
 
-    response.writeHead(200, {
-      "Content-Type":
-        contentTypes[extname(filePath).toLowerCase()] ?? "application/octet-stream",
+    const token = jwt.sign({ sub: ADMIN_USERNAME }, JWT_SECRET, {
+      algorithm: "HS256",
+      expiresIn: sessionDurationSeconds,
     });
-    response.end(request.method === "HEAD" ? undefined : contents);
+    response.cookie(cookieName, token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "strict",
+      path: "/",
+      maxAge: sessionDurationMs,
+    });
+    response.json({ success: true });
   } catch (error) {
-    console.error("Failed to serve request:", error);
-    response.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
-    response.end("Internal Server Error");
+    next(error);
   }
+});
+
+app.post("/api/logout", (_request, response) => {
+  response.clearCookie(cookieName, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "strict",
+    path: "/",
+  });
+  response.json({ success: true });
+});
+
+app.get("/api/me", (request, response) => {
+  response.json({ loggedIn: isAuthenticated(request) });
+});
+
+app.use("/api/admin", requireAdminApi);
+
+app.get("/health", (_request, response) => {
+  response.type("text/plain").send("OK");
+});
+
+app.get(["/admin-lino.html", "/admin"], requireAdminPage, (_request, response, next) => {
+  response.sendFile(adminPagePath, (error) => {
+    if (error) next(error);
+  });
+});
+
+app.get("/citizen", (_request, response, next) => {
+  response.sendFile(indexPath, (error) => {
+    if (error) next(error);
+  });
+});
+
+app.use(express.static(distDirectory));
+
+app.use((_request, response) => {
+  response.status(404).type("text/plain").send("Not Found");
+});
+
+app.use((error, _request, response, next) => {
+  console.error("Request failed:", error);
+  if (response.headersSent) return next(error);
+  response.status(500).type("text/plain").send("Internal Server Error");
+});
+
+const server = app.listen(port, "0.0.0.0", () => {
+  console.log(`WolfWatch listening on 0.0.0.0:${port}`);
 });
 
 server.on("error", (error) => {
   console.error("HTTP server failed:", error);
   process.exit(1);
-});
-
-server.listen(port, "0.0.0.0", () => {
-  console.log(`WolfWatch listening on 0.0.0.0:${port}`);
 });
